@@ -270,10 +270,16 @@ def IGA_PP(pi_alpha,
     pi_beta_gradient_history = [0.]
     for i in range(iteration):
         ########### TODO:Implement IGA-PP (2 points) ###########
-        pi_alpha_gradient = _
-        pi_beta_gradient = _
-        pi_alpha_next = _
-        pi_beta_next = _
+        pi_beta_gradient_for_policy_prediction = pi_alpha*u_beta + (payoff_1[1, 0] - payoff_1[1, 1])
+        predicted_pi_beta = pi_beta + gamma*pi_beta_gradient_for_policy_prediction
+        pi_alpha_gradient = predicted_pi_beta*u_alpha + (payoff_0[0, 1] - payoff_0[1, 1])
+
+        pi_alpha_gradient_for_policy_prediction = pi_beta*u_alpha + (payoff_0[0, 1] - payoff_0[1, 1])
+        predicted_pi_alpha = pi_alpha + gamma*pi_alpha_gradient_for_policy_prediction
+        pi_beta_gradient = predicted_pi_alpha*u_beta + (payoff_1[1, 0] - payoff_1[1, 1])
+
+        pi_alpha_next = pi_alpha + eta*pi_alpha_gradient
+        pi_beta_next = pi_beta + eta*pi_beta_gradient
         ########### END TODO ####################################
         pi_alpha = max(0., min(1., pi_alpha_next))
         pi_beta = max(0., min(1., pi_beta_next))
