@@ -25,376 +25,376 @@ the Matrix Game, the Stochastic Game, the Nonzero-sum Game and Deep Multi-Agent 
 # %%
 import math
 
-# %%
-"""
-## Part I: Matrix Game (10 points)
-
-We start with the simplest setting: Matrix Game (a.k.a Stage Game/Normal Form Game). In this part, you will try to solve the matrix game with full knowledge of the payoff for each player in the game.
-
-
-
-Given a two-player, two-action matrix game, we have the payoff matrices as follows:
-$$
-\mathbf{R}^1 = \left[\begin{matrix}
-0 & 3 \\
-1 &2
-\end{matrix}\right] 
-\quad 
-\mathbf{R}^2 = \left[\begin{matrix}
-3 & 2 \\
-0 & 1
-\end{matrix}\right]
-$$
-
-Each player selects an action from the action space $\{1,2\}$ which determines the payoffs to the players. If the player 1 chooses action $i$ and the player 2 chooses action $j$, then the player 1 and player2 receive the rewards $r^1_{ij}$ and $r^2_{ij}$ respectively. For example, if both players choose action $1$, then the player 1 would have $r^1_{11}=0$ and player 1 would receive $r^2_{11}=3$.
-
-Then, we can use $\alpha\in [0,1] $ represents the strategy for player 1, where $\alpha$ corresponds to the probability of player 1 selecting the first action (action 1), and $1-\alpha$ is the probability of choosing the second action (action 2). Similarly, we use $\beta$ to be the strategy for player 2.
-
-Given the pair of strategies $(\alpha, \beta)$, we can have the expected payoffs for two players. Denote $V^1(\alpha, \beta)$ and $V^2(\alpha, \beta)$ as the expected payoffs for two players respectively:
-
-$$
-\begin{aligned} V^{1}(\alpha, \beta) &=\alpha \beta r^1_{11}+\alpha(1-\beta) r^1_{12}+(1-\alpha) \beta r^1_{21}+(1-\alpha)(1-\beta) r^1_{22} \\ &=u^1 \alpha \beta+\alpha\left(r^1_{12}-r^1_{22}\right)+\beta\left(r^1_{21}-r^1_{22}\right)+r^1_{22} \end{aligned}
-$$
-$$
-\begin{aligned} V^{2}(\alpha, \beta) &=\alpha \beta r^2_{11}+\alpha(1-\beta) r^2_{12}+(1-\alpha) \beta r^2_{21}+(1-\alpha)(1-\beta) r^2_{22} \\ &=u^2 \alpha \beta+\alpha\left(r^2_{12}-r^2_{22}\right)+\beta\left(r^2_{21}-r^2_{22}\right)+r^2_{22}\end{aligned}
-$$
-
-where
-
-$$
-\begin{aligned} u^1 &=r^1_{11}-r^1_{12}-r^1_{21}+r^1_{22} \\  u^2 &=r^2_{11}-r^2_{12}-r^2_{21}+r^2_{22} .\end{aligned}
-$$
-
-
-"""
-
-# %%
-"""
-#### Set up matrix game (4 points)
-
-
-"""
-
-# %%
-import numpy as np
-from copy import deepcopy
-
-
-def U(payoff):
-    ########### TODO: Compute u (1 point) ###########
-    u = payoff[0,0] - payoff[0,1] - payoff[1,0] + payoff[1,1]
-    ########### END TODO ############################
-    return u
-  
-    
-# expected payoff
-def V(alpha, beta, payoff):
-    ########### TODO: Compute expected payoff of given strategies alpha and beta (1 point) ###########
-    u = U(payoff)
-    v = u*alpha*beta + alpha*(payoff[0,1]-payoff[1,1]) + beta*(payoff[1,0]-payoff[1,1]) + payoff[1,1]
-    ########### END TODO ##############################################################################
-    return v
-
-
-payoff_0 = np.array([[0, 3], 
-                     [1, 2]])
-payoff_1 = np.array([[3, 2], 
-                     [0, 1]])
-
-pi_alpha = 0. # init policy for player 1
-pi_beta = 0.9 # init policy for player 2
-
-########### TODO:Give nash strategy of given matrix game (2 points) ###########
-pi_alpha_nash = 1/2  # nash strategy for player 1
-pi_beta_nash = 1/2 # nash strategy for player 2
-########### END TODO ###############################################################
-
-u_alpha = U(payoff_0)
-u_beta = U(payoff_1)
-
-# %%
-assert math.isclose(U(payoff_0), -2)
-assert math.isclose(U(payoff_1), 2)
-
-assert math.isclose(V(alpha=0.2, beta=0.9, payoff=payoff_0), 47/50)
-assert math.isclose(V(alpha=0.6, beta=0.4, payoff=payoff_1), 42/25)
-
-# %%
-"""
-#### Infinitesimal Gredient Ascent (IGA) (2 points)
-
-To find the optimal strategies, here we use the [Infinitesimal Gradient Ascent (IGA)](https://www.sciencedirect.com/science/article/pii/S0004370202001212) to adjust the strategies at each iteration by considering the effect of changing its strategy on its expected payoffs.  These effects can be captured by calculating the partial derivatives of its expected payoff with respect to its strategy.
-
-$$
-\begin{aligned} \frac{\partial V^{1}(\alpha, \beta)}{\partial \alpha} &=\beta u^1+\left(r^1_{12}-r^1_{22}\right) \\ \frac{\partial V^{2}(\alpha, \beta)}{\partial \beta} &=\alpha u^2+\left(r^2_{21}-r^2_{22}\right). \end{aligned}
-$$
-
-According the gradient from partial derivatives, players could adjust the strategies in the direction of current gradient with some step size $\eta$. If $(\alpha_k, \beta_k)$ is the strategy pair at $k$th iteration, then using IGA update the strategies would get the new strategies:
-
-$$
-\begin{array}{l}{\alpha_{k+1}=\alpha_{k}+\eta \frac{\partial V^{1}\left(\alpha_{k}, \beta_{k}\right)}{\partial \alpha_{k}}} \\ {\beta_{k+1}=\beta_{k}+\eta \frac{\partial V^{2}\left(\alpha_{k}, \beta_{k}\right)}{\partial \beta_{k}}}\end{array}
-$$
-"""
-
-# %%
-def IGA(pi_alpha,
-        pi_beta,
-        payoff_0,
-        payoff_1,
-        u_alpha,
-        u_beta,
-        iteration=1000, # iteration number
-        eta=0.01 # step size
-       ):
-    pi_alpha_history = [pi_alpha]
-    pi_beta_history = [pi_beta]
-    pi_alpha_gradient_history = [0.]
-    pi_beta_gradient_history = [0.]
-    for i in range(iteration):
-        ########### TODO:Implement IGA (2 points) ###########
-        pi_alpha_gradient = pi_beta*u_alpha + (payoff_0[0, 1] - payoff_0[1, 1])
-        pi_beta_gradient = pi_alpha*u_beta + (payoff_1[1, 0] - payoff_1[1, 1])
-        pi_alpha_next = pi_alpha + eta*pi_alpha_gradient
-        pi_beta_next = pi_beta + eta*pi_beta_gradient
-        ########### END TODO ###############################
-        pi_alpha = max(0., min(1., pi_alpha_next))
-        pi_beta = max(0., min(1., pi_beta_next))
-        pi_alpha_gradient_history.append(pi_alpha_gradient)
-        pi_beta_gradient_history.append(pi_beta_gradient)
-        pi_alpha_history.append(pi_alpha)
-        pi_beta_history.append(pi_beta)
-    return pi_alpha_history, \
-           pi_beta_history, \
-           pi_alpha_gradient_history, \
-           pi_beta_gradient_history
-
-# %%
-"""
-#### WoLF-IGA (2 points)
-
-The above IGA algorithm uses constant step size. A specific method for varying the learning rate here is [IGA WoLF (Win or Learn Fast)](https://www.sciencedirect.com/science/article/pii/S0004370202001212),  it allows the step size varies over time. Let $\alpha^{e}$ and $\beta^{e}$ represent the equilibrium strategies of two players, now we have new updated rules for WoLF-IGA algorithm:
-
-$$
-\begin{array}{l}{\alpha_{k+1}=\alpha_{k}+\eta_k^{1} \frac{\partial V^{1}\left(\alpha_{k}, \beta_{k}\right)}{\partial \alpha_{k}}} \\ {\beta_{k+1}=\beta_{k}+\eta_k^{2}  \frac{\partial V^{2}\left(\alpha_{k}, \beta_{k}\right)}{\partial \beta_{k}}}\end{array}
-$$
-
-where
-
-$$
-\eta_{k}^{1}=\left\{\begin{array}{l}{\eta_{\min } \text { if } V^1\left(\alpha_{k}, \beta_{k}\right)>V^1\left(\alpha^{e}, \beta_{k}\right)} \\ {\eta_{\max } \text { otherwise }}\end{array}\right.
-$$
-$$
-\eta_{k}^{2}=\left\{\begin{array}{l}{\eta_{\min } \text { if } V^2\left(\alpha_{k}, \beta_{k}\right)>V^2\left(\alpha_{k}, \beta^{e}\right)} \\ {\eta_{\max } \text { otherwise }}\end{array}\right.
-$$.
-
-
-"""
-
-# %%
-def WoLF_IGA(pi_alpha,
-             pi_beta, 
-             payoff_0, 
-             payoff_1,
-             u_alpha,
-             u_beta,
-             pi_alpha_nash, 
-             pi_beta_nash,
-             iteration=1000,
-             eta_min=0.01, # min step size
-             eta_max=0.04 # max step size 
-            ):
-    pi_alpha_history = [pi_alpha]
-    pi_beta_history = [pi_beta]
-    pi_alpha_gradient_history = [0.]
-    pi_beta_gradient_history = [0.]
-    for i in range(iteration):
-        ########### TODO:Implement WoLF-IGA (2 points) ###########
-        pi_alpha_gradient = pi_beta*u_alpha + (payoff_0[0, 1] - payoff_0[1, 1])
-        pi_beta_gradient = pi_alpha*u_beta + (payoff_1[1, 0] - payoff_1[1, 1])
-
-        player_0_current_strategy_expected_payoff = V(alpha=pi_alpha, beta=pi_beta, payoff=payoff_0)
-        player_0_equilibrium_strategy_expected_payoff = V(alpha=pi_alpha_nash, beta=pi_beta, payoff=payoff_0)
-        player_0_is_winning = player_0_current_strategy_expected_payoff > player_0_equilibrium_strategy_expected_payoff
-        eta_0 = eta_min if player_0_is_winning else eta_max
-        pi_alpha_next = pi_alpha + eta_0*pi_alpha_gradient
-
-        player_1_current_strategy_expected_payoff = V(alpha=pi_alpha, beta=pi_beta, payoff=payoff_1)
-        player_1_equilibrium_strategy_expected_payoff = V(alpha=pi_alpha, beta=pi_beta_nash, payoff=payoff_1)
-        player_1_is_winning = player_1_current_strategy_expected_payoff > player_1_equilibrium_strategy_expected_payoff
-        eta_1 = eta_min if player_1_is_winning else eta_max
-        pi_beta_next = pi_beta + eta_1*pi_beta_gradient
-        ########### END TODO #####################################
-        pi_alpha = max(0., min(1., pi_alpha_next))
-        pi_beta = max(0., min(1., pi_beta_next))
-        pi_alpha_gradient_history.append(pi_alpha_gradient)
-        pi_beta_gradient_history.append(pi_beta_gradient)
-        pi_alpha_history.append(pi_alpha)
-        pi_beta_history.append(pi_beta)
-    return pi_alpha_history, \
-           pi_beta_history, \
-           pi_alpha_gradient_history, \
-           pi_beta_gradient_history
-
-# %%
-myboolean = False
-myvar = 'foo' if myboolean else 'foobar'
-print(myvar)
-
-# %%
-"""
-#### IGA-PP (2 points)
-
-The IGA agent uses the gradient from other's current strategies to adjust its strategy. Suppose that one player knows the change direction of the other’s strategy,
-i.e., strategy derivative, in addition to its current strategy.
-Then the player can forecast the other’s strategy and adjust its strategy in response to the forecasted strategy. Thus the strategy update rules is changed to by using the policy prediction ([IGA-PP](https://www.aaai.org/ocs/index.php/AAAI/AAAI10/paper/view/1885)):
-
-$$
-\begin{array}{l}{\alpha_{k+1}=\alpha_{k}+\eta\frac{\partial V^{1}\left(\alpha_{k}, \beta_{k} + \gamma \partial_{\beta}V^{2}\left(\alpha_{k}, \beta_{k}\right)  \right)}{\partial \alpha_{k}}} \\ {\beta_{k+1}=\beta_{k}+\eta  \frac{\partial V^{2}\left(\alpha_{k} + \gamma \partial_{\alpha} V^{1}\left(\alpha_{k}, \beta_{k} \right) , \beta_{k}\right)}{\partial \beta_{k}}}\end{array}
-$$
-"""
-
-# %%
-def IGA_PP(pi_alpha,
-           pi_beta,
-           payoff_0,
-           payoff_1,
-           u_alpha,
-           u_beta,
-           iteration=10000,
-           eta=0.01, # step size
-           gamma=0.01 # step size for policy prediction
-          ):
-    pi_alpha_history = [pi_alpha]
-    pi_beta_history = [pi_beta]
-    pi_alpha_gradient_history = [0.]
-    pi_beta_gradient_history = [0.]
-    for i in range(iteration):
-        ########### TODO:Implement IGA-PP (2 points) ###########
-        pi_beta_gradient_for_policy_prediction = pi_alpha*u_beta + (payoff_1[1, 0] - payoff_1[1, 1])
-        predicted_pi_beta = pi_beta + gamma*pi_beta_gradient_for_policy_prediction
-        pi_alpha_gradient = predicted_pi_beta*u_alpha + (payoff_0[0, 1] - payoff_0[1, 1])
-
-        pi_alpha_gradient_for_policy_prediction = pi_beta*u_alpha + (payoff_0[0, 1] - payoff_0[1, 1])
-        predicted_pi_alpha = pi_alpha + gamma*pi_alpha_gradient_for_policy_prediction
-        pi_beta_gradient = predicted_pi_alpha*u_beta + (payoff_1[1, 0] - payoff_1[1, 1])
-
-        pi_alpha_next = pi_alpha + eta*pi_alpha_gradient
-        pi_beta_next = pi_beta + eta*pi_beta_gradient
-        ########### END TODO ####################################
-        pi_alpha = max(0., min(1., pi_alpha_next))
-        pi_beta = max(0., min(1., pi_beta_next))
-        pi_alpha_gradient_history.append(pi_alpha_gradient)
-        pi_beta_gradient_history.append(pi_beta_gradient)
-        pi_alpha_history.append(pi_alpha)
-        pi_beta_history.append(pi_beta)
-    return pi_alpha_history, \
-           pi_beta_history, \
-           pi_alpha_gradient_history, \
-           pi_beta_gradient_history
-
-# %%
-"""
-#### Run and compare different methods
-"""
-
-# %%
-%matplotlib inline
-import matplotlib
-import matplotlib.pyplot as plt
-
-FONTSIZE = 12
-
-# Tool to plot the learning dynamics
-def plot_dynamics(history_pi_0, history_pi_1, pi_alpha_gradient_history, pi_beta_gradient_history, title=''):
-    colors = range(len(history_pi_1))
-    fig = plt.figure(figsize=(6, 5))
-    ax = fig.add_subplot(111)
-
-    scatter = ax.scatter(history_pi_0, history_pi_1, c=colors, s=1)
-    ax.scatter(0.5, 0.5, c='r', s=15., marker='*')
-    colorbar = fig.colorbar(scatter, ax=ax)
-    colorbar.set_label('Iterations', rotation=270, fontsize=FONTSIZE)
-
-    skip = slice(0, len(history_pi_0), 50)
-    ax.quiver(history_pi_0[skip],
-              history_pi_1[skip],
-              pi_alpha_gradient_history[skip],
-              pi_beta_gradient_history[skip],
-              units='xy', scale=10., zorder=3, color='blue',
-              width=0.007, headwidth=3., headlength=4.)
-
-    ax.set_ylabel("Policy of Player 2", fontsize=FONTSIZE)
-    ax.set_xlabel("Policy of Player 1", fontsize=FONTSIZE)
-    ax.set_ylim(0, 1)
-    ax.set_xlim(0, 1)
-    ax.set_title(title, fontsize=FONTSIZE+8)
-    plt.tight_layout()
-    plt.show()
-
-
-# %%
-"""
-We have set up the running code for three algorithms on given matrix game as below. You can run/validate and tune (e.g., try different parameters, observe the convergence and learning dynamics) the results by yourself.
-"""
-
-# %%
-agents = ['IGA', 'WoLF-IGA', 'IGA-PP']
-
-for agent in agents:
-
-  if agent == 'IGA':
-      pi_alpha_history, \
-      pi_beta_history, \
-      pi_alpha_gradient_history, \
-      pi_beta_gradient_history = IGA(pi_alpha,
-                                     pi_beta,
-                                     payoff_0,
-                                     payoff_1,
-                                     u_alpha,
-                                     u_beta,
-                                     iteration=1000, # iteration number
-                                     eta=0.01 # step size
-                                    )
-  elif agent == 'WoLF-IGA':
-      pi_alpha_history, \
-      pi_beta_history, \
-      pi_alpha_gradient_history, \
-      pi_beta_gradient_history = WoLF_IGA(pi_alpha,
-                                          pi_beta,
-                                          payoff_0,
-                                          payoff_1,
-                                          u_alpha,
-                                          u_beta,
-                                          pi_alpha_nash=pi_alpha_nash,
-                                          pi_beta_nash=pi_beta_nash,
-                                          iteration=1000, # iteration number
-                                          eta_min=0.01, # min step size
-                                          eta_max=0.04 # max step size 
-                                         )
-
-
-  elif agent == 'IGA-PP':
-      pi_alpha_history, \
-      pi_beta_history, \
-      pi_alpha_gradient_history, \
-      pi_beta_gradient_history = IGA_PP(pi_alpha,
-                                        pi_beta,
-                                        payoff_0,
-                                        payoff_1,
-                                        u_alpha,
-                                        u_beta,
-                                        iteration=10000, # iteration number
-                                        eta=0.01, # step size
-                                        gamma=0.01 # step size for policy prediction
-                                       )
-
-
-  plot_dynamics(pi_alpha_history,
-                pi_beta_history,
-                pi_alpha_gradient_history,
-                pi_beta_gradient_history,
-                agent)
-  print('{} Done'.format(agent))
+# # %%
+# """
+# ## Part I: Matrix Game (10 points)
+#
+# We start with the simplest setting: Matrix Game (a.k.a Stage Game/Normal Form Game). In this part, you will try to solve the matrix game with full knowledge of the payoff for each player in the game.
+#
+#
+#
+# Given a two-player, two-action matrix game, we have the payoff matrices as follows:
+# $$
+# \mathbf{R}^1 = \left[\begin{matrix}
+# 0 & 3 \\
+# 1 &2
+# \end{matrix}\right]
+# \quad
+# \mathbf{R}^2 = \left[\begin{matrix}
+# 3 & 2 \\
+# 0 & 1
+# \end{matrix}\right]
+# $$
+#
+# Each player selects an action from the action space $\{1,2\}$ which determines the payoffs to the players. If the player 1 chooses action $i$ and the player 2 chooses action $j$, then the player 1 and player2 receive the rewards $r^1_{ij}$ and $r^2_{ij}$ respectively. For example, if both players choose action $1$, then the player 1 would have $r^1_{11}=0$ and player 1 would receive $r^2_{11}=3$.
+#
+# Then, we can use $\alpha\in [0,1] $ represents the strategy for player 1, where $\alpha$ corresponds to the probability of player 1 selecting the first action (action 1), and $1-\alpha$ is the probability of choosing the second action (action 2). Similarly, we use $\beta$ to be the strategy for player 2.
+#
+# Given the pair of strategies $(\alpha, \beta)$, we can have the expected payoffs for two players. Denote $V^1(\alpha, \beta)$ and $V^2(\alpha, \beta)$ as the expected payoffs for two players respectively:
+#
+# $$
+# \begin{aligned} V^{1}(\alpha, \beta) &=\alpha \beta r^1_{11}+\alpha(1-\beta) r^1_{12}+(1-\alpha) \beta r^1_{21}+(1-\alpha)(1-\beta) r^1_{22} \\ &=u^1 \alpha \beta+\alpha\left(r^1_{12}-r^1_{22}\right)+\beta\left(r^1_{21}-r^1_{22}\right)+r^1_{22} \end{aligned}
+# $$
+# $$
+# \begin{aligned} V^{2}(\alpha, \beta) &=\alpha \beta r^2_{11}+\alpha(1-\beta) r^2_{12}+(1-\alpha) \beta r^2_{21}+(1-\alpha)(1-\beta) r^2_{22} \\ &=u^2 \alpha \beta+\alpha\left(r^2_{12}-r^2_{22}\right)+\beta\left(r^2_{21}-r^2_{22}\right)+r^2_{22}\end{aligned}
+# $$
+#
+# where
+#
+# $$
+# \begin{aligned} u^1 &=r^1_{11}-r^1_{12}-r^1_{21}+r^1_{22} \\  u^2 &=r^2_{11}-r^2_{12}-r^2_{21}+r^2_{22} .\end{aligned}
+# $$
+#
+#
+# """
+#
+# # %%
+# """
+# #### Set up matrix game (4 points)
+#
+#
+# """
+#
+# # %%
+# import numpy as np
+# from copy import deepcopy
+#
+#
+# def U(payoff):
+#     ########### TODO: Compute u (1 point) ###########
+#     u = payoff[0,0] - payoff[0,1] - payoff[1,0] + payoff[1,1]
+#     ########### END TODO ############################
+#     return u
+#
+#
+# # expected payoff
+# def V(alpha, beta, payoff):
+#     ########### TODO: Compute expected payoff of given strategies alpha and beta (1 point) ###########
+#     u = U(payoff)
+#     v = u*alpha*beta + alpha*(payoff[0,1]-payoff[1,1]) + beta*(payoff[1,0]-payoff[1,1]) + payoff[1,1]
+#     ########### END TODO ##############################################################################
+#     return v
+#
+#
+# payoff_0 = np.array([[0, 3],
+#                      [1, 2]])
+# payoff_1 = np.array([[3, 2],
+#                      [0, 1]])
+#
+# pi_alpha = 0. # init policy for player 1
+# pi_beta = 0.9 # init policy for player 2
+#
+# ########### TODO:Give nash strategy of given matrix game (2 points) ###########
+# pi_alpha_nash = 1/2  # nash strategy for player 1
+# pi_beta_nash = 1/2 # nash strategy for player 2
+# ########### END TODO ###############################################################
+#
+# u_alpha = U(payoff_0)
+# u_beta = U(payoff_1)
+#
+# # %%
+# assert math.isclose(U(payoff_0), -2)
+# assert math.isclose(U(payoff_1), 2)
+#
+# assert math.isclose(V(alpha=0.2, beta=0.9, payoff=payoff_0), 47/50)
+# assert math.isclose(V(alpha=0.6, beta=0.4, payoff=payoff_1), 42/25)
+#
+# # %%
+# """
+# #### Infinitesimal Gredient Ascent (IGA) (2 points)
+#
+# To find the optimal strategies, here we use the [Infinitesimal Gradient Ascent (IGA)](https://www.sciencedirect.com/science/article/pii/S0004370202001212) to adjust the strategies at each iteration by considering the effect of changing its strategy on its expected payoffs.  These effects can be captured by calculating the partial derivatives of its expected payoff with respect to its strategy.
+#
+# $$
+# \begin{aligned} \frac{\partial V^{1}(\alpha, \beta)}{\partial \alpha} &=\beta u^1+\left(r^1_{12}-r^1_{22}\right) \\ \frac{\partial V^{2}(\alpha, \beta)}{\partial \beta} &=\alpha u^2+\left(r^2_{21}-r^2_{22}\right). \end{aligned}
+# $$
+#
+# According the gradient from partial derivatives, players could adjust the strategies in the direction of current gradient with some step size $\eta$. If $(\alpha_k, \beta_k)$ is the strategy pair at $k$th iteration, then using IGA update the strategies would get the new strategies:
+#
+# $$
+# \begin{array}{l}{\alpha_{k+1}=\alpha_{k}+\eta \frac{\partial V^{1}\left(\alpha_{k}, \beta_{k}\right)}{\partial \alpha_{k}}} \\ {\beta_{k+1}=\beta_{k}+\eta \frac{\partial V^{2}\left(\alpha_{k}, \beta_{k}\right)}{\partial \beta_{k}}}\end{array}
+# $$
+# """
+#
+# # %%
+# def IGA(pi_alpha,
+#         pi_beta,
+#         payoff_0,
+#         payoff_1,
+#         u_alpha,
+#         u_beta,
+#         iteration=1000, # iteration number
+#         eta=0.01 # step size
+#        ):
+#     pi_alpha_history = [pi_alpha]
+#     pi_beta_history = [pi_beta]
+#     pi_alpha_gradient_history = [0.]
+#     pi_beta_gradient_history = [0.]
+#     for i in range(iteration):
+#         ########### TODO:Implement IGA (2 points) ###########
+#         pi_alpha_gradient = pi_beta*u_alpha + (payoff_0[0, 1] - payoff_0[1, 1])
+#         pi_beta_gradient = pi_alpha*u_beta + (payoff_1[1, 0] - payoff_1[1, 1])
+#         pi_alpha_next = pi_alpha + eta*pi_alpha_gradient
+#         pi_beta_next = pi_beta + eta*pi_beta_gradient
+#         ########### END TODO ###############################
+#         pi_alpha = max(0., min(1., pi_alpha_next))
+#         pi_beta = max(0., min(1., pi_beta_next))
+#         pi_alpha_gradient_history.append(pi_alpha_gradient)
+#         pi_beta_gradient_history.append(pi_beta_gradient)
+#         pi_alpha_history.append(pi_alpha)
+#         pi_beta_history.append(pi_beta)
+#     return pi_alpha_history, \
+#            pi_beta_history, \
+#            pi_alpha_gradient_history, \
+#            pi_beta_gradient_history
+#
+# # %%
+# """
+# #### WoLF-IGA (2 points)
+#
+# The above IGA algorithm uses constant step size. A specific method for varying the learning rate here is [IGA WoLF (Win or Learn Fast)](https://www.sciencedirect.com/science/article/pii/S0004370202001212),  it allows the step size varies over time. Let $\alpha^{e}$ and $\beta^{e}$ represent the equilibrium strategies of two players, now we have new updated rules for WoLF-IGA algorithm:
+#
+# $$
+# \begin{array}{l}{\alpha_{k+1}=\alpha_{k}+\eta_k^{1} \frac{\partial V^{1}\left(\alpha_{k}, \beta_{k}\right)}{\partial \alpha_{k}}} \\ {\beta_{k+1}=\beta_{k}+\eta_k^{2}  \frac{\partial V^{2}\left(\alpha_{k}, \beta_{k}\right)}{\partial \beta_{k}}}\end{array}
+# $$
+#
+# where
+#
+# $$
+# \eta_{k}^{1}=\left\{\begin{array}{l}{\eta_{\min } \text { if } V^1\left(\alpha_{k}, \beta_{k}\right)>V^1\left(\alpha^{e}, \beta_{k}\right)} \\ {\eta_{\max } \text { otherwise }}\end{array}\right.
+# $$
+# $$
+# \eta_{k}^{2}=\left\{\begin{array}{l}{\eta_{\min } \text { if } V^2\left(\alpha_{k}, \beta_{k}\right)>V^2\left(\alpha_{k}, \beta^{e}\right)} \\ {\eta_{\max } \text { otherwise }}\end{array}\right.
+# $$.
+#
+#
+# """
+#
+# # %%
+# def WoLF_IGA(pi_alpha,
+#              pi_beta,
+#              payoff_0,
+#              payoff_1,
+#              u_alpha,
+#              u_beta,
+#              pi_alpha_nash,
+#              pi_beta_nash,
+#              iteration=1000,
+#              eta_min=0.01, # min step size
+#              eta_max=0.04 # max step size
+#             ):
+#     pi_alpha_history = [pi_alpha]
+#     pi_beta_history = [pi_beta]
+#     pi_alpha_gradient_history = [0.]
+#     pi_beta_gradient_history = [0.]
+#     for i in range(iteration):
+#         ########### TODO:Implement WoLF-IGA (2 points) ###########
+#         pi_alpha_gradient = pi_beta*u_alpha + (payoff_0[0, 1] - payoff_0[1, 1])
+#         pi_beta_gradient = pi_alpha*u_beta + (payoff_1[1, 0] - payoff_1[1, 1])
+#
+#         player_0_current_strategy_expected_payoff = V(alpha=pi_alpha, beta=pi_beta, payoff=payoff_0)
+#         player_0_equilibrium_strategy_expected_payoff = V(alpha=pi_alpha_nash, beta=pi_beta, payoff=payoff_0)
+#         player_0_is_winning = player_0_current_strategy_expected_payoff > player_0_equilibrium_strategy_expected_payoff
+#         eta_0 = eta_min if player_0_is_winning else eta_max
+#         pi_alpha_next = pi_alpha + eta_0*pi_alpha_gradient
+#
+#         player_1_current_strategy_expected_payoff = V(alpha=pi_alpha, beta=pi_beta, payoff=payoff_1)
+#         player_1_equilibrium_strategy_expected_payoff = V(alpha=pi_alpha, beta=pi_beta_nash, payoff=payoff_1)
+#         player_1_is_winning = player_1_current_strategy_expected_payoff > player_1_equilibrium_strategy_expected_payoff
+#         eta_1 = eta_min if player_1_is_winning else eta_max
+#         pi_beta_next = pi_beta + eta_1*pi_beta_gradient
+#         ########### END TODO #####################################
+#         pi_alpha = max(0., min(1., pi_alpha_next))
+#         pi_beta = max(0., min(1., pi_beta_next))
+#         pi_alpha_gradient_history.append(pi_alpha_gradient)
+#         pi_beta_gradient_history.append(pi_beta_gradient)
+#         pi_alpha_history.append(pi_alpha)
+#         pi_beta_history.append(pi_beta)
+#     return pi_alpha_history, \
+#            pi_beta_history, \
+#            pi_alpha_gradient_history, \
+#            pi_beta_gradient_history
+#
+# # %%
+# myboolean = False
+# myvar = 'foo' if myboolean else 'foobar'
+# print(myvar)
+#
+# # %%
+# """
+# #### IGA-PP (2 points)
+#
+# The IGA agent uses the gradient from other's current strategies to adjust its strategy. Suppose that one player knows the change direction of the other’s strategy,
+# i.e., strategy derivative, in addition to its current strategy.
+# Then the player can forecast the other’s strategy and adjust its strategy in response to the forecasted strategy. Thus the strategy update rules is changed to by using the policy prediction ([IGA-PP](https://www.aaai.org/ocs/index.php/AAAI/AAAI10/paper/view/1885)):
+#
+# $$
+# \begin{array}{l}{\alpha_{k+1}=\alpha_{k}+\eta\frac{\partial V^{1}\left(\alpha_{k}, \beta_{k} + \gamma \partial_{\beta}V^{2}\left(\alpha_{k}, \beta_{k}\right)  \right)}{\partial \alpha_{k}}} \\ {\beta_{k+1}=\beta_{k}+\eta  \frac{\partial V^{2}\left(\alpha_{k} + \gamma \partial_{\alpha} V^{1}\left(\alpha_{k}, \beta_{k} \right) , \beta_{k}\right)}{\partial \beta_{k}}}\end{array}
+# $$
+# """
+#
+# # %%
+# def IGA_PP(pi_alpha,
+#            pi_beta,
+#            payoff_0,
+#            payoff_1,
+#            u_alpha,
+#            u_beta,
+#            iteration=10000,
+#            eta=0.01, # step size
+#            gamma=0.01 # step size for policy prediction
+#           ):
+#     pi_alpha_history = [pi_alpha]
+#     pi_beta_history = [pi_beta]
+#     pi_alpha_gradient_history = [0.]
+#     pi_beta_gradient_history = [0.]
+#     for i in range(iteration):
+#         ########### TODO:Implement IGA-PP (2 points) ###########
+#         pi_beta_gradient_for_policy_prediction = pi_alpha*u_beta + (payoff_1[1, 0] - payoff_1[1, 1])
+#         predicted_pi_beta = pi_beta + gamma*pi_beta_gradient_for_policy_prediction
+#         pi_alpha_gradient = predicted_pi_beta*u_alpha + (payoff_0[0, 1] - payoff_0[1, 1])
+#
+#         pi_alpha_gradient_for_policy_prediction = pi_beta*u_alpha + (payoff_0[0, 1] - payoff_0[1, 1])
+#         predicted_pi_alpha = pi_alpha + gamma*pi_alpha_gradient_for_policy_prediction
+#         pi_beta_gradient = predicted_pi_alpha*u_beta + (payoff_1[1, 0] - payoff_1[1, 1])
+#
+#         pi_alpha_next = pi_alpha + eta*pi_alpha_gradient
+#         pi_beta_next = pi_beta + eta*pi_beta_gradient
+#         ########### END TODO ####################################
+#         pi_alpha = max(0., min(1., pi_alpha_next))
+#         pi_beta = max(0., min(1., pi_beta_next))
+#         pi_alpha_gradient_history.append(pi_alpha_gradient)
+#         pi_beta_gradient_history.append(pi_beta_gradient)
+#         pi_alpha_history.append(pi_alpha)
+#         pi_beta_history.append(pi_beta)
+#     return pi_alpha_history, \
+#            pi_beta_history, \
+#            pi_alpha_gradient_history, \
+#            pi_beta_gradient_history
+#
+# # %%
+# """
+# #### Run and compare different methods
+# """
+#
+# # %%
+# # %matplotlib inline
+# import matplotlib
+# import matplotlib.pyplot as plt
+#
+# FONTSIZE = 12
+#
+# # Tool to plot the learning dynamics
+# def plot_dynamics(history_pi_0, history_pi_1, pi_alpha_gradient_history, pi_beta_gradient_history, title=''):
+#     colors = range(len(history_pi_1))
+#     fig = plt.figure(figsize=(6, 5))
+#     ax = fig.add_subplot(111)
+#
+#     scatter = ax.scatter(history_pi_0, history_pi_1, c=colors, s=1)
+#     ax.scatter(0.5, 0.5, c='r', s=15., marker='*')
+#     colorbar = fig.colorbar(scatter, ax=ax)
+#     colorbar.set_label('Iterations', rotation=270, fontsize=FONTSIZE)
+#
+#     skip = slice(0, len(history_pi_0), 50)
+#     ax.quiver(history_pi_0[skip],
+#               history_pi_1[skip],
+#               pi_alpha_gradient_history[skip],
+#               pi_beta_gradient_history[skip],
+#               units='xy', scale=10., zorder=3, color='blue',
+#               width=0.007, headwidth=3., headlength=4.)
+#
+#     ax.set_ylabel("Policy of Player 2", fontsize=FONTSIZE)
+#     ax.set_xlabel("Policy of Player 1", fontsize=FONTSIZE)
+#     ax.set_ylim(0, 1)
+#     ax.set_xlim(0, 1)
+#     ax.set_title(title, fontsize=FONTSIZE+8)
+#     plt.tight_layout()
+#     plt.show()
+#
+#
+# # %%
+# """
+# We have set up the running code for three algorithms on given matrix game as below. You can run/validate and tune (e.g., try different parameters, observe the convergence and learning dynamics) the results by yourself.
+# """
+#
+# # %%
+# agents = ['IGA', 'WoLF-IGA', 'IGA-PP']
+#
+# for agent in agents:
+#
+#     if agent == 'IGA':
+#         pi_alpha_history, \
+#         pi_beta_history, \
+#         pi_alpha_gradient_history, \
+#         pi_beta_gradient_history = IGA(pi_alpha,
+#                                      pi_beta,
+#                                      payoff_0,
+#                                      payoff_1,
+#                                      u_alpha,
+#                                      u_beta,
+#                                      iteration=1000, # iteration number
+#                                      eta=0.01 # step size
+#                                     )
+#     elif agent == 'WoLF-IGA':
+#         pi_alpha_history, \
+#         pi_beta_history, \
+#         pi_alpha_gradient_history, \
+#         pi_beta_gradient_history = WoLF_IGA(pi_alpha,
+#                                           pi_beta,
+#                                           payoff_0,
+#                                           payoff_1,
+#                                           u_alpha,
+#                                           u_beta,
+#                                           pi_alpha_nash=pi_alpha_nash,
+#                                           pi_beta_nash=pi_beta_nash,
+#                                           iteration=1000, # iteration number
+#                                           eta_min=0.01, # min step size
+#                                           eta_max=0.04 # max step size
+#                                          )
+#
+#
+#     elif agent == 'IGA-PP':
+#         pi_alpha_history, \
+#         pi_beta_history, \
+#         pi_alpha_gradient_history, \
+#         pi_beta_gradient_history = IGA_PP(pi_alpha,
+#                                         pi_beta,
+#                                         payoff_0,
+#                                         payoff_1,
+#                                         u_alpha,
+#                                         u_beta,
+#                                         iteration=10000, # iteration number
+#                                         eta=0.01, # step size
+#                                         gamma=0.01 # step size for policy prediction
+#                                        )
+#
+#
+#     plot_dynamics(pi_alpha_history,
+#                 pi_beta_history,
+#                 pi_alpha_gradient_history,
+#                 pi_beta_gradient_history,
+#                 agent)
+#     print('{} Done'.format(agent))
 
 # %%
 """
@@ -474,7 +474,7 @@ class StochasticGame():
         info["branch"] = self.branch
 
         if self.good_branches == 4:
-            reward = 1 if self.branch == current_branch else 0 # Need to follow your branch
+            reward = 1 if self.branch == current_branch else 0  # Need to follow your branch
         elif self.good_branches == 2:
             reward = 1 if self.branch in [0,3] and self.branch == current_branch else 0
         else:
@@ -555,7 +555,7 @@ import random
 import numpy as np
 
 def sample(pi):
-  return np.random.choice(pi.size, size=1, p=pi)[0]
+    return np.random.choice(pi.size, size=1, p=pi)[0]
 
 def normalize(pi):
     minprob = np.min(pi)
@@ -627,23 +627,23 @@ class QAgent(BaseQAgent):
     def update(self, observation, action, reward, next_observation, done):
         self.count_R[observation][action] += 1.0
         self.R[observation][action] += (reward - self.R[observation][action]) / self.count_R[observation][action]
-        Q = self.Q[observation]
-        V = self.val(next_observation)
-        
+
         if done:
             ########### TODO:Implement Q-Learning (Q updating for termination) (1 point) ###########
-
+            self.Q[observation][:] = 0
             ########### END TODO #####################################################
         else:
             ########### TODO:Implement Q-Learning (Q updating) (1 point) ###########
-            
+            V = self.val(next_observation)
+            self.Q[observation][action] += self.phi*(reward + self.gamma*V - self.Q[observation][action])
             ########### END TODO #####################################################
         self.update_policy(observation, action)
         self.epoch += 1
 
     def val(self, observation):
         ########### TODO:Implement Q-Learning (V) (1 point) ###########
-        
+        Q_s = self.Q[observation]
+        v = np.max(Q_s)
         ########### END TODO ##########################################
         return v
 
@@ -651,7 +651,7 @@ class QAgent(BaseQAgent):
         Q = self.Q[observation]
         self.pi[observation] = (Q == np.max(Q)).astype(np.double)
         self.pi[observation] = self.pi[observation] / np.sum(self.pi[observation])
-  
+
 
 # %%
 """
@@ -664,81 +664,84 @@ import matplotlib
 import matplotlib.pyplot as plt
 from copy import deepcopy
 
-def rollout(env, agents, exploration=True, max_iter=5000, log_episode_interval=100, verbose=False):
-  history_reward = []
-  state_n = env.reset()
-  episode_reward = 0
-  episode_count = 0
-  recorded_episodes = []
-  recorded_episode_reward = []
-  for i in range(max_iter):
-      actions = np.array([agent.act(state, exploration) for state, agent in zip(state_n, agents)])
-      next_state_n, reward_n, done_n, _ = env.step(actions)
-      episode_reward += np.mean(reward_n)
-      for j, (state, reward, next_state, done, agent) in enumerate(zip(state_n, reward_n, next_state_n, done_n, agents)):
-          agent.update(state, actions[j], reward, next_state, done)
-      state_n = next_state_n
-      if np.all(done_n):
-          state_n = env.reset()
-          history_reward.append(episode_reward)
-          episode_reward = 0
-          episode_count += 1
-          if (i + 1) %  log_episode_interval == 0:
-            recorded_episodes.append(i)
-            episodes_mean_reward = np.mean(history_reward)
-            recorded_episode_reward.append(episodes_mean_reward)
-            history_reward = []
+def rollout(env, agents, exploration=True, max_episode=30000, log_episode_interval=500, verbose=False):
+    history_reward = []
+    state_n = env.reset()
+    episode_reward = 0
+    episode_count = 0
+    recorded_episodes = []
+    recorded_episode_reward = []
+    while episode_count < max_episode:
+        actions = np.array([agent.act(state, exploration) for state, agent in zip(state_n, agents)])
+        next_state_n, reward_n, done_n, _ = env.step(actions)
+        episode_reward += np.mean(reward_n)
+        for j, (state, reward, next_state, done, agent) in enumerate(zip(state_n, reward_n, next_state_n, done_n, agents)):
+            agent.update(state, actions[j], reward, next_state, done)
+        state_n = next_state_n
+        if np.all(done_n):
+            state_n = env.reset()
+            history_reward.append(episode_reward)
+            episode_reward = 0
+            episode_count += 1
+            if episode_count % log_episode_interval == 0:
+                recorded_episodes.append(episode_count)
+                episodes_mean_reward = np.mean(history_reward)
+                recorded_episode_reward.append(episodes_mean_reward)
+                history_reward = []
             if verbose:
-                print('Iterations {}, Reward {}'.format(i, episodes_mean_reward))
-  return recorded_episodes, recorded_episode_reward
+                print('Episodes {}, Reward {}'.format(episode_count, episodes_mean_reward))
+    return recorded_episodes, recorded_episode_reward
 
 # %%
 agent_num = 2
 action_num = 2
 
 runs = 10
+log_episode_interval = 500
 # store data for each run
 train_recorded_episodes_log = []
 train_recorded_episode_reward_log = []
 test_recorded_episode_reward_log = []
 
 for i in range(runs):
-  ##################################### INITIALISATION ####################################
-  agents = []
-  env = StochasticGame()
-  for i in range(agent_num):
-      agent = QAgent(action_num=action_num)
-      agents.append(agent)
+    ##################################### INITIALISATION ####################################
+    agents = []
+    env = StochasticGame()
+    for i in range(agent_num):
+        agent = QAgent(action_num=action_num)
+        agents.append(agent)
 
-  ####################################### TRAINING #######################################
-  train_recorded_episodes, train_recorded_episode_reward = rollout(env=env, 
-                                                                  agents=agents, 
-                                                                  exploration=True, 
-                                                                  max_iter=50000)
-  # store result for every run
-  train_recorded_episodes_log.append(train_recorded_episodes)
-  train_recorded_episode_reward_log.append(train_recorded_episode_reward)
+    ####################################### TRAINING #######################################
+    train_recorded_episodes, train_recorded_episode_reward = rollout(env=env,
+                                                                  agents=agents,
+                                                                  exploration=True,
+                                                                  max_episode=30000,
+                                                                  log_episode_interval=log_episode_interval)
+    # store result for every run
+    train_recorded_episodes_log.append(train_recorded_episodes)
+    train_recorded_episode_reward_log.append(train_recorded_episode_reward)
 
-  ####################################### TESTING #######################################
-  test_recorded_episodes, test_recorded_episode_reward = rollout(env=env, 
-                                                               agents=agents, 
-                                                               exploration=False, 
-                                                               max_iter=10, 
+    ####################################### TESTING #######################################
+    test_recorded_episodes, test_recorded_episode_reward = rollout(env=env,
+                                                               agents=agents,
+                                                               exploration=False,
+                                                               max_episode=10,
                                                                log_episode_interval=1)
-  # store result for every run
-  test_recorded_episode_reward_log.append(np.mean(test_recorded_episode_reward))
+    # store result for every run
+    test_recorded_episode_reward_log.append(np.mean(test_recorded_episode_reward))
 
 # %%
 ####################################### TRAINING #######################################
-# different episodes returned every time so each learning curve shown separately
+
+import seaborn as sns; sns.set()
+import pandas as pd
 fig = plt.figure(figsize=(9, 7))
 ax = fig.add_subplot(111)
-
-for i in range(runs):
-  ax.plot(train_recorded_episodes_log[i], train_recorded_episode_reward_log[i], label=f'run {i}')
+df_reward = pd.DataFrame(train_recorded_episode_reward_log).melt()
+sns.lineplot(ax=ax, x='variable', y='value', data=df_reward)
 ax.set_title(f"Train learning Curve for {runs} runs")
 ax.set_ylabel("Episodic Reward")
-ax.set_xlabel("Iterations")
+ax.set_xlabel("Episodes * " + str(log_episode_interval))
 ax.legend(loc="lower right")
 plt.tight_layout()
 plt.show()
@@ -1350,21 +1353,21 @@ The following command will download the required scripts and set up the environm
 """
 
 # %%
-!rm -rf /content/ma-gym  
-!git clone https://github.com/koulanurag/ma-gym.git 
-%cd /content/ma-gym 
-!pip install -q -e . 
-!apt-get install -y xvfb python-opengl x11-utils > /dev/null 2>&1
-!pip install pyvirtualdisplay > /dev/null 2>&1
-!apt-get install x11-utils
-!apt-get update > /dev/null 2>&1
-!apt-get install cmake > /dev/null 2>&1
-!pip install --upgrade setuptools 2>&1
-!pip install ez_setup > /dev/null 2>&1
-!pip install -U gym[atari] > /dev/null 2>&1
+# !rm -rf /content/ma-gym
+# !git clone https://github.com/koulanurag/ma-gym.git
+# %cd /content/ma-gym
+# !pip install -q -e .
+# !apt-get install -y xvfb python-opengl x11-utils > /dev/null 2>&1
+# !pip install pyvirtualdisplay > /dev/null 2>&1
+# !apt-get install x11-utils
+# !apt-get update > /dev/null 2>&1
+# !apt-get install cmake > /dev/null 2>&1
+# !pip install --upgrade setuptools 2>&1
+# !pip install ez_setup > /dev/null 2>&1
+# !pip install -U gym[atari] > /dev/null 2>&1
 
 # %%
-%matplotlib inline
+# %matplotlib inline
 import gym
 import ma_gym
 from ma_gym.wrappers import Monitor
