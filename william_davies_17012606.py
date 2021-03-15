@@ -630,12 +630,13 @@ class QAgent(BaseQAgent):
 
         if done:
             ########### TODO:Implement Q-Learning (Q updating for termination) (1 point) ###########
-            self.Q[observation][:] = 0
+            V = 0  # the quality of state s' is 0 because it is a terminal state
+            self.Q[observation][action] = (1 - self.phi)*self.Q[observation][action] + self.phi*(reward + self.gamma*V)
             ########### END TODO #####################################################
         else:
             ########### TODO:Implement Q-Learning (Q updating) (1 point) ###########
             V = self.val(next_observation)
-            self.Q[observation][action] += self.phi*(reward + self.gamma*V - self.Q[observation][action])
+            self.Q[observation][action] = (1 - self.phi)*self.Q[observation][action] + self.phi*(reward + self.gamma*V)
             ########### END TODO #####################################################
         self.update_policy(observation, action)
         self.epoch += 1
