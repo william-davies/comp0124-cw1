@@ -397,6 +397,8 @@ import math
 #     print('{} Done'.format(agent))
 
 # %%
+from scipy import special
+
 """
 ## Part II: Stochastic Game  (10 points)
 """
@@ -694,61 +696,61 @@ def rollout(env, agents, exploration=True, max_episode=30000, log_episode_interv
     return recorded_episodes, recorded_episode_reward
 
 # %%
-agent_num = 2
-action_num = 2
-
-runs = 10
-log_episode_interval = 500
-# store data for each run
-train_recorded_episodes_log = []
-train_recorded_episode_reward_log = []
-test_recorded_episode_reward_log = []
-
-for i in range(runs):
-    ##################################### INITIALISATION ####################################
-    agents = []
-    env = StochasticGame()
-    for i in range(agent_num):
-        agent = QAgent(action_num=action_num)
-        agents.append(agent)
-
-    ####################################### TRAINING #######################################
-    train_recorded_episodes, train_recorded_episode_reward = rollout(env=env,
-                                                                  agents=agents,
-                                                                  exploration=True,
-                                                                  max_episode=30000,
-                                                                  log_episode_interval=log_episode_interval)
-    # store result for every run
-    train_recorded_episodes_log.append(train_recorded_episodes)
-    train_recorded_episode_reward_log.append(train_recorded_episode_reward)
-
-    ####################################### TESTING #######################################
-    test_recorded_episodes, test_recorded_episode_reward = rollout(env=env,
-                                                               agents=agents,
-                                                               exploration=False,
-                                                               max_episode=10,
-                                                               log_episode_interval=1)
-    # store result for every run
-    test_recorded_episode_reward_log.append(np.mean(test_recorded_episode_reward))
+# agent_num = 2
+# action_num = 2
+#
+# runs = 10
+# log_episode_interval = 500
+# # store data for each run
+# train_recorded_episodes_log = []
+# train_recorded_episode_reward_log = []
+# test_recorded_episode_reward_log = []
+#
+# for i in range(runs):
+#     ##################################### INITIALISATION ####################################
+#     agents = []
+#     env = StochasticGame()
+#     for i in range(agent_num):
+#         agent = QAgent(action_num=action_num)
+#         agents.append(agent)
+#
+#     ####################################### TRAINING #######################################
+#     train_recorded_episodes, train_recorded_episode_reward = rollout(env=env,
+#                                                                   agents=agents,
+#                                                                   exploration=True,
+#                                                                   max_episode=30000,
+#                                                                   log_episode_interval=log_episode_interval)
+#     # store result for every run
+#     train_recorded_episodes_log.append(train_recorded_episodes)
+#     train_recorded_episode_reward_log.append(train_recorded_episode_reward)
+#
+#     ####################################### TESTING #######################################
+#     test_recorded_episodes, test_recorded_episode_reward = rollout(env=env,
+#                                                                agents=agents,
+#                                                                exploration=False,
+#                                                                max_episode=10,
+#                                                                log_episode_interval=1)
+#     # store result for every run
+#     test_recorded_episode_reward_log.append(np.mean(test_recorded_episode_reward))
 
 # %%
 ####################################### TRAINING #######################################
 
-import seaborn as sns; sns.set()
-import pandas as pd
-fig = plt.figure(figsize=(9, 7))
-ax = fig.add_subplot(111)
-df_reward = pd.DataFrame(train_recorded_episode_reward_log).melt()
-sns.lineplot(ax=ax, x='variable', y='value', data=df_reward)
-ax.set_title(f"Train learning Curve for {runs} runs")
-ax.set_ylabel("Episodic Reward")
-ax.set_xlabel("Episodes * " + str(log_episode_interval))
-ax.legend(loc="lower right")
-plt.tight_layout()
-plt.show()
+# import seaborn as sns; sns.set()
+# import pandas as pd
+# fig = plt.figure(figsize=(9, 7))
+# ax = fig.add_subplot(111)
+# df_reward = pd.DataFrame(train_recorded_episode_reward_log).melt()
+# sns.lineplot(ax=ax, x='variable', y='value', data=df_reward)
+# ax.set_title(f"Train learning Curve for {runs} runs")
+# ax.set_ylabel("Episodic Reward")
+# ax.set_xlabel("Episodes * " + str(log_episode_interval))
+# ax.legend(loc="lower right")
+# plt.tight_layout()
+# plt.show()
 
 ####################################### TESTING #######################################
-print(f'Test reward is (average over {runs} runs):', np.mean(test_recorded_episode_reward_log))
+# print(f'Test reward is (average over {runs} runs):', np.mean(test_recorded_episode_reward_log))
 
 # %%
 """
@@ -768,22 +770,59 @@ Points will be given based on the performance of your algorithm, e.g., if the te
 # You can write any code to implement your CoolAgent, please ouput
 # action via the act(observation, exploration) method
 class CoolAgent(BaseQAgent):
-    def __init__(self, **kwargs):
+    def __init__(self, temperature, **kwargs):
         super().__init__('CoolAgent', **kwargs)
+        self.Q = defaultdict(partial(np.random.rand, self.action_num))
+        self.temperature = temperature
 
     def done(self):
         pass
 
     def act(self, observation, exploration):
-        pass
+        """
+        If we are not exploring, choose actions greedily.
+        Args:
+            observation:
+            exploration:
+
+        Returns:
+
+        """
+        if exploration:
+            return sample(self.pi[observation])
+        else:
+            return np.argmax(self.pi[observation])
 
     @abstractmethod
     def update(self, observation, action, reward, next_observation, done):
-        pass
+        if done:
+            V = 0  # the quality of state s' is 0 because it is a terminal state
+            self.Q[observation][action] = (1 - self.phi)*self.Q[observation][action] + self.phi*(reward + self.gamma*V)
+        else:
+            V = self.val(next_observation)
+            self.Q[observation][action] = (1 - self.phi)*self.Q[observation][action] + self.phi*(reward + self.gamma*V)
+        self.update_policy(observation, action)
+        self.epoch += 1
+
+    def val(self, observation):
+        Q_s = self.Q[observation]
+        v = np.max(Q_s)
+        return v
 
     @abstractmethod
     def update_policy(self, observation, action):
-        pass
+        """
+        Use Boltzmann exploration.
+        Args:
+            observation:
+            action:
+
+        Returns: None.
+
+        """
+        Q = self.Q[observation]
+        softmax = special.softmax(x=Q/self.temperature)
+        self.pi[observation] = softmax
 
 # %%
 # Feel Free to write code here to train and tune your cool agents, 
@@ -794,54 +833,59 @@ agent_num = 2
 action_num = 2
 
 runs = 10
+cool_log_episode_interval = 500
 # store data for each run
 train_cool_recorded_episodes_log = []
 train_cool_recorded_episode_reward_log = []
 test_cool_recorded_episode_reward_log = []
+temperature = 0.5
 
 for i in range(runs):
-  ##################################### INITIALISATION ####################################
-  agents = []
-  env = StochasticGame()
-  for i in range(agent_num):
-      agent = CoolAgent(action_num=action_num)
-      agents.append(agent)
+    ##################################### INITIALISATION ####################################
+    agents = []
+    env = StochasticGame()
+    for i in range(agent_num):
+        agent = CoolAgent(action_num=action_num, temperature=temperature)
+        agents.append(agent)
 
-  ####################################### TRAINING #######################################
-  train_cool_recorded_episodes, train_cool_recorded_episode_reward = rollout(env=env, 
-                                                                  agents=agents, 
-                                                                  exploration=True, 
-                                                                  max_iter=70000)
-  # store result for every run
-  train_cool_recorded_episodes_log.append(train_cool_recorded_episodes)
-  train_cool_recorded_episode_reward_log.append(train_cool_recorded_episode_reward)
-  
-  ####################################### TESTING #######################################
-  #########################################
-  cool_agents = agents
-  # Cool agent evaluation code, please do not change
-  cool_env = StochasticGame()
-  test_cool_recorded_episodes, test_cool_recorded_episode_reward = rollout(env=cool_env, 
-                                                                        agents=cool_agents, 
-                                                                        exploration=False, 
-                                                                        max_iter=10, 
+    ####################################### TRAINING #######################################
+    train_cool_recorded_episodes, train_cool_recorded_episode_reward = rollout(env=env,
+                                                                  agents=agents,
+                                                                  exploration=True,
+                                                                  max_episode=30000,
+                                                                  log_episode_interval=cool_log_episode_interval)
+    # store result for every run
+    train_cool_recorded_episodes_log.append(train_cool_recorded_episodes)
+    train_cool_recorded_episode_reward_log.append(train_cool_recorded_episode_reward)
+
+    ####################################### TESTING #######################################
+    cool_agents = agents
+    # Cool agent evaluation code, please do not change
+    cool_env = StochasticGame()
+    test_cool_recorded_episodes, test_cool_recorded_episode_reward = rollout(env=cool_env,
+                                                                        agents=cool_agents,
+                                                                        exploration=False,
+                                                                        max_episode=10,
                                                                         log_episode_interval=1)
-  # store result for every run
-  test_cool_recorded_episode_reward_log.append(np.mean(test_cool_recorded_episode_reward))
+    # store result for every run
+    test_cool_recorded_episode_reward_log.append(np.mean(test_cool_recorded_episode_reward))
 
 # %%
 ####################################### TRAINING #######################################
+import seaborn as sns; sns.set()
+import pandas as pd
 fig = plt.figure(figsize=(9, 7))
 ax = fig.add_subplot(111)
-
-for i in range(runs):
-  ax.plot(train_cool_recorded_episodes_log[i], train_cool_recorded_episode_reward_log[i], label=f'run {i+1}')
+df_cool_reward = pd.DataFrame(train_cool_recorded_episode_reward_log).melt()
+sns.lineplot(ax=ax, x='variable', y='value', data=df_cool_reward)
 ax.set_title(f"Train learning Curve for {runs} runs")
 ax.set_ylabel("Episodic Reward")
-ax.set_xlabel("Iterations")
+ax.set_xlabel("Episodes * " + str(cool_log_episode_interval))
 ax.legend(loc="lower right")
 plt.tight_layout()
 plt.show()
+
+print(f'Cool agent\'s test reward is (average over {runs} runs):', np.mean(test_cool_recorded_episode_reward_log))
 
 ####################################### TESTING #######################################
 print(f'Cool agent\'s test reward is (average over {runs} runs):', np.mean(test_cool_recorded_episode_reward_log))
