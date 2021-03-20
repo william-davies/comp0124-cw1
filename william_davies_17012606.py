@@ -22,9 +22,10 @@ the Matrix Game, the Stochastic Game, the Nonzero-sum Game and Deep Multi-Agent 
 6. If you have any questions, please contact TAs: [Minne Li](minne.li@cs.ucl.ac.uk), [Oliver Slumbers](o.slumbers@cs.ucl.ac.uk), [Xihan Li](xihan.li.20@ucl.ac.uk), [Xidong Feng](xidong.feng@cs.ucl.ac.uk), and [Mengyue Yang](m.yang@cs.ucl.ac.uk).
 """
 
-# %%
-import math
-
+# # %%
+# import math
+# from scipy import special
+#
 # # %%
 # """
 # ## Part I: Matrix Game (10 points)
@@ -298,7 +299,7 @@ import math
 # """
 #
 # # %%
-# # %matplotlib inline
+# %matplotlib inline
 # import matplotlib
 # import matplotlib.pyplot as plt
 #
@@ -331,6 +332,9 @@ import math
 #     plt.tight_layout()
 #     plt.show()
 #
+#
+# # %%
+# np.arange(1000)[slice(0, 200, 50)]
 #
 # # %%
 # """
@@ -395,307 +399,303 @@ import math
 #                 pi_beta_gradient_history,
 #                 agent)
 #     print('{} Done'.format(agent))
-
-# %%
-from scipy import special
-
-"""
-## Part II: Stochastic Game  (10 points)
-"""
-
-# %%
-"""
-### Problem Description
-"""
-
-# %%
-"""
-In this part, you are required to implement two agent to play the Stochastic Game, which has non-monotonicity reward and requires exploration to achieve the global optimal. 
-
-There are $3$ intermediate states before arriving at the final state. The game transition and reward matrices are:
-
-![Stochastic Game](https://raw.githubusercontent.com/mlii/mvrl/master/data/sg.png)
-
-Given an initial reward matrix (shown in the middle of the above plot), the choice of joint action leads to different branches. For example, the joint action pair (0, 0) will lead to the left branch, while the joint action pair (1, 1) will lead to the branch on the right. Agents can observe the current step number and branch. Zero rewards lead to the termination state (shown as the red cross).
-
-The optimal policy is to take the top left action pair (0, 0), and finally take the bottom right action pair (1, 1), resulting in a optimal total payoff of $8$.
-
-This game is not easy, because it needs $3$-step exploration to discover the optimal policy, and is hard to deviate from sub-optimal (the right branch). Thus, using a strategic exploration approach is necessary.
-
-"""
-
-# %%
-import numpy as np
-
-
-class StochasticGame():
-    def __init__(self, episode_limit=5, good_branches=2, batch_size=None, **kwargs):
-        # Define the agents
-        self.n_agents = 2
-
-        self.episode_limit = episode_limit
-
-        # Define the internal state
-        self.steps = 0
-
-        r_matrix = [[1,1],[1,1]]
-        self.payoff_values = [r_matrix for _ in range(self.episode_limit)]
-        self.final_step_diff =[[1,1],[1,4]]
-
-        self.branches = 4
-        self.branch = 0
-
-        self.n_actions = len(self.payoff_values[0])
-
-        self.good_branches = good_branches
-
-    def reset(self):
-        """ Returns initial observations and states"""
-        self.steps = 0
-        self.branch = 0
-        return self.get_obs()
-
-    def step(self, actions):
-        """ Returns reward, terminated, info """
-        current_branch = 0
-        if (actions[0], actions[1]) == (0,0):
-            current_branch = 0
-        if (actions[0], actions[1]) == (0,1):
-            current_branch = 1
-        if (actions[0], actions[1]) == (1,0):
-            current_branch = 2
-        if (actions[0], actions[1]) == (1,1):
-            current_branch = 3
-
-        if self.steps == 0:
-            self.branch = current_branch
-
-        info = {}
-
-        info["good_payoff"] = 0
-        info["branch"] = self.branch
-
-        if self.good_branches == 4:
-            reward = 1 if self.branch == current_branch else 0  # Need to follow your branch
-        elif self.good_branches == 2:
-            reward = 1 if self.branch in [0,3] and self.branch == current_branch else 0
-        else:
-            raise Exception("Environment not setup to handle {} good branches".format(self.good_branches))
-
-        if self.episode_limit > 1 and self.steps == self.episode_limit - 1 and self.branch == 0:
-            info["good_payoff"] = 1
-            reward = self.final_step_diff[actions[0]][actions[1]]
-
-        self.steps += 1
-
-        if self.steps < self.episode_limit and reward > 0:
-            terminated = False
-        else:
-            terminated = True
-
-        info["episode_limit"] = False
-
-        # How often the joint-actions are taken
-        info["action_00"] = 0
-        info["action_01"] = 0
-        info["action_10"] = 0
-        info["action_11"] = 0
-        if (actions[0], actions[1]) == (0, 0):
-            info["action_00"] = 1
-        if (actions[0], actions[1]) == (0, 1):
-            info["action_01"] = 1
-        if (actions[0], actions[1]) == (1, 0):
-            info["action_10"] = 1
-        if (actions[0], actions[1]) == (1, 1):
-            info["action_11"] = 1
-
-        return self.get_obs(), [reward] * 2, [terminated] * 2, info
-
-    def get_obs(self):
-        """ Returns all agent observations in a list """
-        one_hot_step = [0] * (self.episode_limit + 1 + self.branches)
-        one_hot_step[self.steps] = 1
-        one_hot_step[self.episode_limit + 1 + self.branch] = 1
-        return [tuple(one_hot_step) for _ in range(self.n_agents)]
-
-    def get_obs_agent(self, agent_id):
-        """ Returns observation for agent_id """
-        return self.get_obs()[agent_id]
-
-    def get_obs_size(self):
-        """ Returns the shape of the observation """
-        return len(self.get_obs_agent(0))
-
-    def get_state(self):
-        return self.get_obs_agent(0)
-
-    def get_state_size(self):
-        """ Returns the shape of the state"""
-        return self.get_obs_size()
-
-    def get_total_actions(self):
-        """ Returns the total number of actions an agent could ever take """
-        return self.n_actions
-
-
-# %%
-"""
-### Example: Random Policy
-"""
-
-# %%
-"""
-A simple agent using random policy is provided below.
-"""
-
-# %%
-from collections import defaultdict
-from functools import partial
-from abc import ABCMeta, abstractmethod
-import random
-
-import numpy as np
-
-def sample(pi):
-    return np.random.choice(pi.size, size=1, p=pi)[0]
-
-def normalize(pi):
-    minprob = np.min(pi)
-    if minprob < 0.0:
-        pi -= minprob
-    pi /= np.sum(pi)
-
-class BaseQAgent:
-    def __init__(self, name, action_num=2, phi=0.01, gamma=0.95, episilon=0.1, **kwargs):
-        self.name = name
-        self.action_num = action_num
-        self.episilon = episilon
-        self.gamma = gamma
-        self.phi = phi
-        self.epoch = 0
-        self.Q = None
-        self.pi = defaultdict(partial(np.random.dirichlet, [1.0] * self.action_num))
-
-    def done(self):
-        pass
-
-    def act(self, observation, exploration=False):
-        if exploration and random.random() < self.episilon:
-            return random.randint(0, self.action_num - 1)
-        else:
-            return sample(self.pi[observation])
-
-    @abstractmethod
-    def update(self, observation, action, reward, next_observation, done):
-        pass
-
-    @abstractmethod
-    def update_policy(self, observation, action):
-        pass
-
-
-
-# %%
-"""
-### TODO: Implement an agent using Q-Learning (3 points)
-"""
-
-# %%
-"""
-Q-Learning is a single agent learning algorithm for finding optimal policies in MDPs. The key updating rule is as follwings:
-
-$$
-Q(s, a) \leftarrow(1-\phi) Q(s, a)+\phi\left(r+\gamma V\left(s^{\prime}\right)\right)
-$$
-
-where,
-$$
-V(s)=\max\left(\left[Q(s, a)_{a \in \mathcal{A}}\right]\right)
-$$
-"""
-
-# %%
-class QAgent(BaseQAgent):
-    def __init__(self, **kwargs):
-        super().__init__('QAgent', **kwargs)
-        self.Q = defaultdict(partial(np.random.rand, self.action_num))
-        self.R = defaultdict(partial(np.zeros, self.action_num))
-        self.count_R = defaultdict(partial(np.zeros, self.action_num))
-
-    def done(self):
-        self.R.clear()
-        self.count_R.clear()
-
-    def update(self, observation, action, reward, next_observation, done):
-        self.count_R[observation][action] += 1.0
-        self.R[observation][action] += (reward - self.R[observation][action]) / self.count_R[observation][action]
-
-        if done:
-            ########### TODO:Implement Q-Learning (Q updating for termination) (1 point) ###########
-            V = 0  # the quality of state s' is 0 because it is a terminal state
-            self.Q[observation][action] = (1 - self.phi)*self.Q[observation][action] + self.phi*(reward + self.gamma*V)
-            ########### END TODO #####################################################
-        else:
-            ########### TODO:Implement Q-Learning (Q updating) (1 point) ###########
-            V = self.val(next_observation)
-            self.Q[observation][action] = (1 - self.phi)*self.Q[observation][action] + self.phi*(reward + self.gamma*V)
-            ########### END TODO #####################################################
-        self.update_policy(observation, action)
-        self.epoch += 1
-
-    def val(self, observation):
-        ########### TODO:Implement Q-Learning (V) (1 point) ###########
-        Q_s = self.Q[observation]
-        v = np.max(Q_s)
-        ########### END TODO ##########################################
-        return v
-
-    def update_policy(self, observation, action):
-        Q = self.Q[observation]
-        self.pi[observation] = (Q == np.max(Q)).astype(np.double)
-        self.pi[observation] = self.pi[observation] / np.sum(self.pi[observation])
-
-
-# %%
-"""
-### Test your Q agents on the Stochastic Game
-"""
-
-# %%
-import numpy as np
-import matplotlib
-import matplotlib.pyplot as plt
-from copy import deepcopy
-
-def rollout(env, agents, exploration=True, max_episode=30000, log_episode_interval=500, verbose=False):
-    history_reward = []
-    state_n = env.reset()
-    episode_reward = 0
-    episode_count = 0
-    recorded_episodes = []
-    recorded_episode_reward = []
-    while episode_count < max_episode:
-        actions = np.array([agent.act(state, exploration) for state, agent in zip(state_n, agents)])
-        next_state_n, reward_n, done_n, _ = env.step(actions)
-        episode_reward += np.mean(reward_n)
-        for j, (state, reward, next_state, done, agent) in enumerate(zip(state_n, reward_n, next_state_n, done_n, agents)):
-            agent.update(state, actions[j], reward, next_state, done)
-        state_n = next_state_n
-        if np.all(done_n):
-            state_n = env.reset()
-            history_reward.append(episode_reward)
-            episode_reward = 0
-            episode_count += 1
-            if episode_count % log_episode_interval == 0:
-                recorded_episodes.append(episode_count)
-                episodes_mean_reward = np.mean(history_reward)
-                recorded_episode_reward.append(episodes_mean_reward)
-                history_reward = []
-            if verbose:
-                print('Episodes {}, Reward {}'.format(episode_count, episodes_mean_reward))
-    return recorded_episodes, recorded_episode_reward
-
-# %%
+#
+# # %%
+# """
+# ## Part II: Stochastic Game  (10 points)
+# """
+#
+# # %%
+# """
+# ### Problem Description
+# """
+#
+# # %%
+# """
+# In this part, you are required to implement two agent to play the Stochastic Game, which has non-monotonicity reward and requires exploration to achieve the global optimal.
+#
+# There are $3$ intermediate states before arriving at the final state. The game transition and reward matrices are:
+#
+# ![Stochastic Game](https://raw.githubusercontent.com/mlii/mvrl/master/data/sg.png)
+#
+# Given an initial reward matrix (shown in the middle of the above plot), the choice of joint action leads to different branches. For example, the joint action pair (0, 0) will lead to the left branch, while the joint action pair (1, 1) will lead to the branch on the right. Agents can observe the current step number and branch. Zero rewards lead to the termination state (shown as the red cross).
+#
+# The optimal policy is to take the top left action pair (0, 0), and finally take the bottom right action pair (1, 1), resulting in a optimal total payoff of $8$.
+#
+# This game is not easy, because it needs $3$-step exploration to discover the optimal policy, and is hard to deviate from sub-optimal (the right branch). Thus, using a strategic exploration approach is necessary.
+#
+# """
+#
+# # %%
+# import numpy as np
+#
+#
+# class StochasticGame():
+#     def __init__(self, episode_limit=5, good_branches=2, batch_size=None, **kwargs):
+#         # Define the agents
+#         self.n_agents = 2
+#
+#         self.episode_limit = episode_limit
+#
+#         # Define the internal state
+#         self.steps = 0
+#
+#         r_matrix = [[1,1],[1,1]]
+#         self.payoff_values = [r_matrix for _ in range(self.episode_limit)]
+#         self.final_step_diff =[[1,1],[1,4]]
+#
+#         self.branches = 4
+#         self.branch = 0
+#
+#         self.n_actions = len(self.payoff_values[0])
+#
+#         self.good_branches = good_branches
+#
+#     def reset(self):
+#         """ Returns initial observations and states"""
+#         self.steps = 0
+#         self.branch = 0
+#         return self.get_obs()
+#
+#     def step(self, actions):
+#         """ Returns reward, terminated, info """
+#         current_branch = 0
+#         if (actions[0], actions[1]) == (0,0):
+#             current_branch = 0
+#         if (actions[0], actions[1]) == (0,1):
+#             current_branch = 1
+#         if (actions[0], actions[1]) == (1,0):
+#             current_branch = 2
+#         if (actions[0], actions[1]) == (1,1):
+#             current_branch = 3
+#
+#         if self.steps == 0:
+#             self.branch = current_branch
+#
+#         info = {}
+#
+#         info["good_payoff"] = 0
+#         info["branch"] = self.branch
+#
+#         if self.good_branches == 4:
+#             reward = 1 if self.branch == current_branch else 0 # Need to follow your branch
+#         elif self.good_branches == 2:
+#             reward = 1 if self.branch in [0,3] and self.branch == current_branch else 0
+#         else:
+#             raise Exception("Environment not setup to handle {} good branches".format(self.good_branches))
+#
+#         if self.episode_limit > 1 and self.steps == self.episode_limit - 1 and self.branch == 0:
+#             info["good_payoff"] = 1
+#             reward = self.final_step_diff[actions[0]][actions[1]]
+#
+#         self.steps += 1
+#
+#         if self.steps < self.episode_limit and reward > 0:
+#             terminated = False
+#         else:
+#             terminated = True
+#
+#         info["episode_limit"] = False
+#
+#         # How often the joint-actions are taken
+#         info["action_00"] = 0
+#         info["action_01"] = 0
+#         info["action_10"] = 0
+#         info["action_11"] = 0
+#         if (actions[0], actions[1]) == (0, 0):
+#             info["action_00"] = 1
+#         if (actions[0], actions[1]) == (0, 1):
+#             info["action_01"] = 1
+#         if (actions[0], actions[1]) == (1, 0):
+#             info["action_10"] = 1
+#         if (actions[0], actions[1]) == (1, 1):
+#             info["action_11"] = 1
+#
+#         return self.get_obs(), [reward] * 2, [terminated] * 2, info
+#
+#     def get_obs(self):
+#         """ Returns all agent observations in a list """
+#         one_hot_step = [0] * (self.episode_limit + 1 + self.branches)
+#         one_hot_step[self.steps] = 1
+#         one_hot_step[self.episode_limit + 1 + self.branch] = 1
+#         return [tuple(one_hot_step) for _ in range(self.n_agents)]
+#
+#     def get_obs_agent(self, agent_id):
+#         """ Returns observation for agent_id """
+#         return self.get_obs()[agent_id]
+#
+#     def get_obs_size(self):
+#         """ Returns the shape of the observation """
+#         return len(self.get_obs_agent(0))
+#
+#     def get_state(self):
+#         return self.get_obs_agent(0)
+#
+#     def get_state_size(self):
+#         """ Returns the shape of the state"""
+#         return self.get_obs_size()
+#
+#     def get_total_actions(self):
+#         """ Returns the total number of actions an agent could ever take """
+#         return self.n_actions
+#
+#
+# # %%
+# """
+# ### Example: Random Policy
+# """
+#
+# # %%
+# """
+# A simple agent using random policy is provided below.
+# """
+#
+# # %%
+# from collections import defaultdict
+# from functools import partial
+# from abc import ABCMeta, abstractmethod
+# import random
+#
+# import numpy as np
+#
+# def sample(pi):
+#     return np.random.choice(pi.size, size=1, p=pi)[0]
+#
+# def normalize(pi):
+#     minprob = np.min(pi)
+#     if minprob < 0.0:
+#         pi -= minprob
+#     pi /= np.sum(pi)
+#
+# class BaseQAgent:
+#     def __init__(self, name, action_num=2, phi=0.01, gamma=0.95, episilon=0.1, **kwargs):
+#         self.name = name
+#         self.action_num = action_num
+#         self.episilon = episilon
+#         self.gamma = gamma
+#         self.phi = phi
+#         self.epoch = 0
+#         self.Q = None
+#         self.pi = defaultdict(partial(np.random.dirichlet, [1.0] * self.action_num))
+#
+#     def done(self):
+#         pass
+#
+#     def act(self, observation, exploration=False):
+#         if exploration and random.random() < self.episilon:
+#             return random.randint(0, self.action_num - 1)
+#         else:
+#             return sample(self.pi[observation])
+#
+#     @abstractmethod
+#     def update(self, observation, action, reward, next_observation, done):
+#         pass
+#
+#     @abstractmethod
+#     def update_policy(self, observation, action):
+#         pass
+#
+#
+# # %%
+# """
+# ### TODO: Implement an agent using Q-Learning (3 points)
+# """
+#
+# # %%
+# """
+# Q-Learning is a single agent learning algorithm for finding optimal policies in MDPs. The key updating rule is as follwings:
+#
+# $$
+# Q(s, a) \leftarrow(1-\phi) Q(s, a)+\phi\left(r+\gamma V\left(s^{\prime}\right)\right)
+# $$
+#
+# where,
+# $$
+# V(s)=\max\left(\left[Q(s, a)_{a \in \mathcal{A}}\right]\right)
+# $$
+# """
+#
+# # %%
+# class QAgent(BaseQAgent):
+#     def __init__(self, **kwargs):
+#         super().__init__('QAgent', **kwargs)
+#         self.Q = defaultdict(partial(np.random.rand, self.action_num))
+#         self.R = defaultdict(partial(np.zeros, self.action_num))
+#         self.count_R = defaultdict(partial(np.zeros, self.action_num))
+#
+#     def done(self):
+#         self.R.clear()
+#         self.count_R.clear()
+#
+#     def update(self, observation, action, reward, next_observation, done):
+#         self.count_R[observation][action] += 1.0
+#         self.R[observation][action] += (reward - self.R[observation][action]) / self.count_R[observation][action]
+#
+#         if done:
+#             ########### TODO:Implement Q-Learning (Q updating for termination) (1 point) ###########
+#             V = 0  # the quality of state s' is 0 because it is a terminal state
+#             self.Q[observation][action] = (1 - self.phi)*self.Q[observation][action] + self.phi*(reward + self.gamma*V)
+#             ########### END TODO #####################################################
+#         else:
+#             ########### TODO:Implement Q-Learning (Q updating) (1 point) ###########
+#             V = self.val(next_observation)
+#             self.Q[observation][action] = (1 - self.phi)*self.Q[observation][action] + self.phi*(reward + self.gamma*V)
+#             ########### END TODO #####################################################
+#         self.update_policy(observation, action)
+#         self.epoch += 1
+#
+#     def val(self, observation):
+#         ########### TODO:Implement Q-Learning (V) (1 point) ###########
+#         Q_s = self.Q[observation]
+#         v = np.max(Q_s)
+#         ########### END TODO ##########################################
+#         return v
+#
+#     def update_policy(self, observation, action):
+#         Q = self.Q[observation]
+#         self.pi[observation] = (Q == np.max(Q)).astype(np.double)
+#         self.pi[observation] = self.pi[observation] / np.sum(self.pi[observation])
+#
+# # %%
+# """
+# ### Test your Q agents on the Stochastic Game
+# """
+#
+# # %%
+# import numpy as np
+# import matplotlib
+# import matplotlib.pyplot as plt
+# from copy import deepcopy
+#
+# def rollout(env, agents, exploration=True, max_episode=30000, log_episode_interval=500, verbose=False):
+#     history_reward = []
+#     state_n = env.reset()
+#     episode_reward = 0
+#     episode_count = 0
+#     recorded_episodes = []
+#     recorded_episode_reward = []
+#     while episode_count < max_episode:
+#         actions = np.array([agent.act(state, exploration) for state, agent in zip(state_n, agents)])
+#         next_state_n, reward_n, done_n, _ = env.step(actions)
+#         episode_reward += np.mean(reward_n)
+#         for j, (state, reward, next_state, done, agent) in enumerate(zip(state_n, reward_n, next_state_n, done_n, agents)):
+#             agent.update(state, actions[j], reward, next_state, done)
+#         state_n = next_state_n
+#         if np.all(done_n):
+#             state_n = env.reset()
+#             history_reward.append(episode_reward)
+#             episode_reward = 0
+#             episode_count += 1
+#             if episode_count % log_episode_interval == 0:
+#                 recorded_episodes.append(episode_count)
+#                 episodes_mean_reward = np.mean(history_reward)
+#                 recorded_episode_reward.append(episodes_mean_reward)
+#                 history_reward = []
+#             if verbose:
+#                 print('Episodes {}, Reward {}'.format(episode_count, episodes_mean_reward))
+#     return recorded_episodes, recorded_episode_reward
+#
+# # %%
 # agent_num = 2
 # action_num = 2
 #
@@ -711,6 +711,7 @@ def rollout(env, agents, exploration=True, max_episode=30000, log_episode_interv
 #     agents = []
 #     env = StochasticGame()
 #     for i in range(agent_num):
+# #         agent = BaseQAgent(name='random', action_num=action_num)
 #         agent = QAgent(action_num=action_num)
 #         agents.append(agent)
 #
@@ -732,10 +733,10 @@ def rollout(env, agents, exploration=True, max_episode=30000, log_episode_interv
 #                                                                log_episode_interval=1)
 #     # store result for every run
 #     test_recorded_episode_reward_log.append(np.mean(test_recorded_episode_reward))
-
-# %%
-####################################### TRAINING #######################################
-
+#
+# # %%
+# ####################################### TRAINING #######################################
+#
 # import seaborn as sns; sns.set()
 # import pandas as pd
 # fig = plt.figure(figsize=(9, 7))
@@ -748,200 +749,254 @@ def rollout(env, agents, exploration=True, max_episode=30000, log_episode_interv
 # ax.legend(loc="lower right")
 # plt.tight_layout()
 # plt.show()
-
-####################################### TESTING #######################################
+#
+# ####################################### TESTING #######################################
 # print(f'Test reward is (average over {runs} runs):', np.mean(test_recorded_episode_reward_log))
-
-# %%
-"""
-### TODO: Implement an Advanced Agent to solve the Stochastic Game (7 points)
-"""
-
-# %%
-"""
-Unless you are extremely lucky, the Q-learning agent implemented above is very hard to succeed in the Stochastic Game. In this part, you are required to implement a really cool agent to play the Stochastic Game. 
-
-**Hint: You might want to use a strategic exploration approach.**
-
-Points will be given based on the performance of your algorithm, e.g., if the test reward of your algorithm is 6, you will be given 6/8*9=6.75 points, since the optimal payoff is 8.
-"""
-
-# %%
-# You can write any code to implement your CoolAgent, please ouput
-# action via the act(observation, exploration) method
-class CoolAgent(BaseQAgent):
-    def __init__(self, temperature, **kwargs):
-        super().__init__('CoolAgent', **kwargs)
-        self.Q = defaultdict(partial(np.random.rand, self.action_num))
-        self.temperature = temperature
-
-    def done(self):
-        pass
-
-    def act(self, observation, exploration):
-        """
-        If we are not exploring, choose actions greedily.
-        Args:
-            observation:
-            exploration:
-
-        Returns:
-
-        """
-        if exploration:
-            return sample(self.pi[observation])
-        else:
-            return np.argmax(self.pi[observation])
-
-    @abstractmethod
-    def update(self, observation, action, reward, next_observation, done):
-        if done:
-            V = 0  # the quality of state s' is 0 because it is a terminal state
-            self.Q[observation][action] = (1 - self.phi)*self.Q[observation][action] + self.phi*(reward + self.gamma*V)
-        else:
-            V = self.val(next_observation)
-            self.Q[observation][action] = (1 - self.phi)*self.Q[observation][action] + self.phi*(reward + self.gamma*V)
-        self.update_policy(observation, action)
-        self.epoch += 1
-
-    def val(self, observation):
-        Q_s = self.Q[observation]
-        v = np.max(Q_s)
-        return v
-
-    @abstractmethod
-    def update_policy(self, observation, action):
-        """
-        Use Boltzmann exploration.
-        Args:
-            observation:
-            action:
-
-        Returns: None.
-
-        """
-        Q = self.Q[observation]
-        softmax = special.softmax(x=Q/self.temperature)
-        self.pi[observation] = softmax
-
-# %%
-# Feel Free to write code here to train and tune your cool agents, 
-# and assign the trained agents to cool_agents at the end
-# ########################################
-# TODO: Your cool agent training code #############
-agent_num = 2
-action_num = 2
-
-runs = 10
-cool_log_episode_interval = 500
-# store data for each run
-train_cool_recorded_episodes_log = []
-train_cool_recorded_episode_reward_log = []
-test_cool_recorded_episode_reward_log = []
-temperature = 0.5
-
-for i in range(runs):
-    ##################################### INITIALISATION ####################################
-    agents = []
-    env = StochasticGame()
-    for i in range(agent_num):
-        agent = CoolAgent(action_num=action_num, temperature=temperature)
-        agents.append(agent)
-
-    ####################################### TRAINING #######################################
-    train_cool_recorded_episodes, train_cool_recorded_episode_reward = rollout(env=env,
-                                                                  agents=agents,
-                                                                  exploration=True,
-                                                                  max_episode=30000,
-                                                                  log_episode_interval=cool_log_episode_interval)
-    # store result for every run
-    train_cool_recorded_episodes_log.append(train_cool_recorded_episodes)
-    train_cool_recorded_episode_reward_log.append(train_cool_recorded_episode_reward)
-
-    ####################################### TESTING #######################################
-    cool_agents = agents
-    # Cool agent evaluation code, please do not change
-    cool_env = StochasticGame()
-    test_cool_recorded_episodes, test_cool_recorded_episode_reward = rollout(env=cool_env,
-                                                                        agents=cool_agents,
-                                                                        exploration=False,
-                                                                        max_episode=10,
-                                                                        log_episode_interval=1)
-    # store result for every run
-    test_cool_recorded_episode_reward_log.append(np.mean(test_cool_recorded_episode_reward))
-
-# %%
-####################################### TRAINING #######################################
-import seaborn as sns; sns.set()
-import pandas as pd
-fig = plt.figure(figsize=(9, 7))
-ax = fig.add_subplot(111)
-df_cool_reward = pd.DataFrame(train_cool_recorded_episode_reward_log).melt()
-sns.lineplot(ax=ax, x='variable', y='value', data=df_cool_reward)
-ax.set_title(f"Train learning Curve for {runs} runs")
-ax.set_ylabel("Episodic Reward")
-ax.set_xlabel("Episodes * " + str(cool_log_episode_interval))
-ax.legend(loc="lower right")
-plt.tight_layout()
-plt.show()
-
-print(f'Cool agent\'s test reward is (average over {runs} runs):', np.mean(test_cool_recorded_episode_reward_log))
-
-####################################### TESTING #######################################
-print(f'Cool agent\'s test reward is (average over {runs} runs):', np.mean(test_cool_recorded_episode_reward_log))
-
-# %%
-"""
-Few words to analysis the results comparing to the Q Agent, and what you have did to improve the performance. (< 300 words)
-
-...
-
-...
-
-...
-
-
-
-"""
-
-# %%
-"""
-## Part III: Cournot Duopoly (12 points)
-
-Cournot Duopoly is a classic static game that models the imperfect competition in which multiple firms compete in price and production to capture market share.
-Since the firms' actions are continuous variables, the game is a continuous action setting.
-It is a **nonzero-sum game** (neither team-based nor zero-sum) which represents a challenge for current MARL methods.
-
-Let $a_i\in [-A_i,A_i]$ represents the set of actions for agent $i\in\{1,2\ldots, N\}:=\mathcal{N}$,
-where $A_i\in \mathbb{R}_{>0}$.
-Each agent $i$'s reward (profit) is 
-$$
-R_i(a_i,a_{-i})=g_i(a_i,a_{-i})+ w_i(a_i),
-$$
-where
-$
-\partial^{2} g_{i} / \partial a_{i}^{2}<0, \partial g_{i} / \partial a_{-i}<0
-$,and 
-$\partial^{2} g_{i} / \partial a_{i} \partial a_{-i}<0
-$.
-Agents adopt Markov policies as
-$
-a_{i} = \pi_i(a_{-i}).
-$
-
-"""
-
-# %%
-"""
-#### TODO: Assume $N=2$, prove that policy $\pi_i$ is non-increasing. (5 points)
-
-
-"""
-
-# %%
-"""
-Your answer here.
-"""
+#
+# # %%
+# test_recorded_episode_reward_log
+#
+# # %%
+# ####################################### TRAINING #######################################
+# # different episodes returned every time so each learning curve shown separately
+# fig = plt.figure(figsize=(9, 7))
+# ax = fig.add_subplot(111)
+#
+# for i in range(runs):
+#     ax.plot(train_recorded_episodes_log[i], train_recorded_episode_reward_log[i], label=f'run {i}')
+# ax.set_title(f"Train learning Curve for {runs} runs")
+# ax.set_ylabel("Episodic Reward")
+# ax.set_xlabel("Iterations")
+# ax.legend(loc="lower right")
+# plt.tight_layout()
+# plt.show()
+#
+# ####################################### TESTING #######################################
+# print(f'Test reward is (average over {runs} runs):', np.mean(test_recorded_episode_reward_log))
+#
+# # %%
+# """
+# ### TODO: Implement an Advanced Agent to solve the Stochastic Game (7 points)
+# """
+#
+# # %%
+# """
+# Unless you are extremely lucky, the Q-learning agent implemented above is very hard to succeed in the Stochastic Game. In this part, you are required to implement a really cool agent to play the Stochastic Game.
+#
+# **Hint: You might want to use a strategic exploration approach.**
+#
+# Points will be given based on the performance of your algorithm, e.g., if the test reward of your algorithm is 6, you will be given 6/8*7=5.25 points, since the optimal payoff is 8.
+# """
+#
+# # %%
+# class CoolAgent(BaseQAgent):
+#     def __init__(self, temperature, **kwargs):
+#         super().__init__('CoolAgent', **kwargs)
+#         self.Q = defaultdict(partial(np.random.rand, self.action_num))
+#         self.temperature = temperature
+#
+#     def done(self):
+#         pass
+#
+#     def act(self, observation, exploration):
+#         """
+#         If we are not exploring, choose actions greedily.
+#         Args:
+#             observation:
+#             exploration:
+#
+#         Returns:
+#
+#         """
+#         if exploration:
+#             return sample(self.pi[observation])
+#         else:
+#             return np.argmax(self.pi[observation])
+#
+#     @abstractmethod
+#     def update(self, observation, action, reward, next_observation, done):
+#         if done:
+#             V = 0  # the quality of state s' is 0 because it is a terminal state
+#             self.Q[observation][action] = (1 - self.phi)*self.Q[observation][action] + self.phi*(reward + self.gamma*V)
+#         else:
+#             V = self.val(next_observation)
+#             self.Q[observation][action] = (1 - self.phi)*self.Q[observation][action] + self.phi*(reward + self.gamma*V)
+#         self.update_policy(observation, action)
+#         self.epoch += 1
+#
+#     def val(self, observation):
+#         Q_s = self.Q[observation]
+#         v = np.max(Q_s)
+#         return v
+#
+#     @abstractmethod
+#     def update_policy(self, observation, action):
+#         """
+#         Use Boltzmann exploration.
+#         Args:
+#             observation:
+#             action:
+#
+#         Returns: None.
+#
+#         """
+#         Q = self.Q[observation]
+#         softmax = special.softmax(x=Q/self.temperature)
+#         self.pi[observation] = softmax
+#
+# # %%
+# # Feel Free to write code here to train and tune your cool agents,
+# # and assign the trained agents to cool_agents at the end
+# # ########################################
+# # TODO: Your cool agent training code #############
+# agent_num = 2
+# action_num = 2
+#
+# runs = 10
+# cool_log_episode_interval = 500
+# # store data for each run
+# train_cool_recorded_episodes_log = []
+# train_cool_recorded_episode_reward_log = []
+# test_cool_recorded_episode_reward_log = []
+# temperature = 2
+#
+# for i in range(runs):
+#     ##################################### INITIALISATION ####################################
+#     agents = []
+#     env = StochasticGame()
+#     for i in range(agent_num):
+#         agent = CoolAgent(action_num=action_num, temperature=temperature)
+#         agents.append(agent)
+#
+#     ####################################### TRAINING #######################################
+#     train_cool_recorded_episodes, train_cool_recorded_episode_reward = rollout(env=env,
+#                                                                   agents=agents,
+#                                                                   exploration=True,
+#                                                                   max_episode=30000,
+#                                                                   log_episode_interval=cool_log_episode_interval)
+#     # store result for every run
+#     train_cool_recorded_episodes_log.append(train_cool_recorded_episodes)
+#     train_cool_recorded_episode_reward_log.append(train_cool_recorded_episode_reward)
+#
+#     ####################################### TESTING #######################################
+#     cool_agents = agents
+#     # Cool agent evaluation code, please do not change
+#     cool_env = StochasticGame()
+#     test_cool_recorded_episodes, test_cool_recorded_episode_reward = rollout(env=cool_env,
+#                                                                         agents=cool_agents,
+#                                                                         exploration=False,
+#                                                                         max_episode=10,
+#                                                                         log_episode_interval=1)
+#     # store result for every run
+#     test_cool_recorded_episode_reward_log.append(np.mean(test_cool_recorded_episode_reward))
+#
+# # %%
+# ####################################### TRAINING #######################################
+# import seaborn as sns; sns.set()
+# import pandas as pd
+# fig = plt.figure(figsize=(9, 7))
+# ax = fig.add_subplot(111)
+# df_cool_reward = pd.DataFrame(train_cool_recorded_episode_reward_log).melt()
+# sns.lineplot(ax=ax, x='variable', y='value', data=df_cool_reward)
+# ax.set_title(f"Train learning Curve for {runs} runs")
+# ax.set_ylabel("Episodic Reward")
+# ax.set_xlabel("Episodes * " + str(cool_log_episode_interval))
+# ax.legend(loc="lower right")
+# plt.tight_layout()
+# plt.show()
+#
+# print(f'Cool agent\'s test reward is (average over {runs} runs):', np.mean(test_cool_recorded_episode_reward_log))
+#
+#
+# # %%
+# ####################################### TRAINING #######################################
+# # different episodes returned every time so each learning curve shown separately
+# fig = plt.figure(figsize=(9, 7))
+# ax = fig.add_subplot(111)
+#
+# for i in range(runs):
+#     ax.plot(train_cool_recorded_episodes_log[i], train_cool_recorded_episode_reward_log[i], label=f'run {i}')
+# ax.set_title(f"Train learning Curve for {runs} runs")
+# ax.set_ylabel("Episodic Reward")
+# ax.set_xlabel("Iterations")
+# ax.legend(loc="lower right")
+# plt.tight_layout()
+# plt.show()
+#
+# ####################################### TESTING #######################################
+# print(f'Cool agent\'s test reward is (average over {runs} runs):', np.mean(test_cool_recorded_episode_reward_log))
+#
+# # %%
+# test_cool_recorded_episode_reward_log
+#
+# # %%
+# """
+# Few words to analysis the results comparing to the Q Agent, and what you have did to improve the performance. (< 300 words)
+#
+# **Q-Agent problems**
+#
+# The epsilon-greedy exploration of the Q-Agent is not optimal. In epsilon-greedy, the agent only distinguishes between greedy and non-greedy actions. Therefore, the agent fails to pay more attention to non-greedy but potentially promising actions than non-greedy actions which the agent estimates to be largely sub-optimal.
+#
+# This makes it very easy to fall into local optima, such as taking the right branch.
+#
+# **Boltzmann agent solutions**
+#
+# I have used Boltzmann exploration to address this shortcoming. In Boltzmann exploration, the probability of choosing an action given a state is:
+#
+# $\pi_t(a|s) = \frac{exp(Q_t(s, a)/\tau)}{\sum_{b=1}^{k} exp(Q_t(s, b)/\tau)}$
+#
+# Where $\tau$ is the positive temperature parameter. A larger $\tau$ “flattens” the softmax distribution and promotes exploration. Whereas a smaller $\tau$ promotes greedy action selection. The temperature parameter can be annealed over time but in this specific game, it was sufficient to use a constant $\tau$. $\tau$ = 2 was chosen following a hyperparameter search.
+#
+# The softmax policy helps the agent avoid being trapped in suboptimal policies.
+#
+# **Comparing the results**
+#
+# From the train learning curve for the Q-Agent, one can see that the epsilon-greedy behaviour hinders exploration. The agent either gets stuck in a sub-optimal policy with a reward of 5, or luckily finds the optimal policy with a reward of 8.  However, after this initial convergence, there is little chance for exploration (only run 2 manages to escape the local optimum, whereas run 8 and run 9 stay stuck).
+#
+# Conversely, for the train learning curve for the Boltzmann agent, one can see that the agent is exploring extensively for at least 15,000 episodes across all 10 runs. This increased exploration allows it to find the optimal policy with a reward of 8. When exploration=False during testing, the agent can greedily choose this optimal policy.
+#
+#
+#
+# """
+#
+# # %%
+# """
+# ## Part III: Cournot Duopoly (12 points)
+#
+# Cournot Duopoly is a classic static game that models the imperfect competition in which multiple firms compete in price and production to capture market share.
+# Since the firms' actions are continuous variables, the game is a continuous action setting.
+# It is a **nonzero-sum game** (neither team-based nor zero-sum) which represents a challenge for current MARL methods.
+#
+# Let $a_i\in [-A_i,A_i]$ represents the set of actions for agent $i\in\{1,2\ldots, N\}:=\mathcal{N}$,
+# where $A_i\in \mathbb{R}_{>0}$.
+# Each agent $i$'s reward (profit) is
+# $$
+# R_i(a_i,a_{-i})=g_i(a_i,a_{-i})+ w_i(a_i),
+# $$
+# where
+# $
+# \partial^{2} g_{i} / \partial a_{i}^{2}<0, \partial g_{i} / \partial a_{-i}<0
+# $,and
+# $\partial^{2} g_{i} / \partial a_{i} \partial a_{-i}<0
+# $.
+# Agents adopt Markov policies as
+# $
+# a_{i} = \pi_i(a_{-i}).
+# $
+#
+# """
+#
+# # %%
+# """
+# #### TODO: Assume $N=2$, prove that policy $\pi_i$ is non-increasing. (5 points)
+#
+#
+# """
+#
+# # %%
+# """
+# Your answer here.
+# """
 
 # %%
 """
@@ -971,9 +1026,9 @@ class CournotDuopoly(gym.Env):
         self.rewards = np.zeros((self.agent_num,))
         self.t = 0
 
-        alpha = 1.5
-        beta = 1.0
-        gamma = -0.5
+        self.alpha = 1.5
+        self.beta = 1.0
+        self.gamma = -0.5
 
         def payoff_n_cournot(action_n, i):
             """
@@ -983,7 +1038,9 @@ class CournotDuopoly(gym.Env):
             :return: R_i(a_i,a_{-i})
             """
             ########### TODO: Compute R_i(a_i,a_{-i}) (1 point) ###########
-            r = _
+            g = action_n[i] * (self.alpha - self.beta*np.sum(action_n))
+            w = self.gamma * action_n[i]
+            r = g + w
             ########### END TODO ############################
             return r
 
@@ -995,7 +1052,7 @@ class CournotDuopoly(gym.Env):
             :return: \partial R_i(a_i,a_{-i}) / \partial a_i
             """
             ########### TODO: Compute \partial R_i(a_i,a_{-i}) / \partial a_i (1 point) ###########
-            dr = _
+            dr = self.alpha - self.beta*(np.sum(action_n) + action_n[i]) + self.gamma
             ########### END TODO ############################
             return dr
         
@@ -1006,8 +1063,8 @@ class CournotDuopoly(gym.Env):
         """
         Define the environment step function.
         :param action_n: (nd.array) a list of all agents' actions, shape is (agent_num,)
-        :return: state_n: (nd.array) a list of all agents' actions, shape is (agent_num,)
-        :return: reward_n: (nd.array) a list of all agents' states, shape is (agent_num,)
+        :return: state_n: (nd.array) a list of all agents' states, shape is (agent_num,)
+        :return: reward_n: (nd.array) a list of all agents' rewards, shape is (agent_num,)
         :return: done_n: (nd.array) a list of all agents' done status, shape is (agent_num,)
         :return: info: (dict) a dictionary of customized information
         """
@@ -1125,13 +1182,15 @@ class MADDPG:
         for target_param, param in zip(self.actor_target_network.parameters(),
                                        self.actor_network.parameters()):
             ########### TODO: Soft-update target actor network (0.5 point) ###########
-            target_param.data.copy_(None)
+            new_target_param = self.tau*param + (1 - self.tau)*target_param
+            target_param.data.copy_(new_target_param)
             ########### END TODO ############################
 
         for target_param, param in zip(self.critic_target_network.parameters(),
                                        self.critic_network.parameters()):
             ########### TODO: Soft-update target critic network (0.5 point) ###########
-            target_param.data.copy_(None)
+            new_target_param = self.tau*param + (1 - self.tau)*target_param
+            target_param.data.copy_(new_target_param)
             ########### END TODO ############################
 
     # update the network
@@ -1158,19 +1217,25 @@ class MADDPG:
             q_next = self.critic_target_network(o_next, u_next).detach()
 
             ########### TODO: Calculate the target Q value function (0.5 point) ###########
-            target_q = _
+            target_q = r + self.gamma*q_next
             ########### END TODO ############################
 
         # the q loss
         q_value = self.critic_network(o, u)
         ########### TODO: Calculate the critic loss (0.5 point) ###########
-        critic_loss = _
+        critic_loss = torch.mean((target_q - q_value)**2)
         ########### END TODO ############################
 
         # the actor loss
+        # N.B. the actions, u, stored in the replay buffer include random noise so we need to get the noiseless outputs
+        # of the actor network here
         u[self.agent_id] = self.actor_network(o[self.agent_id])
+        for other_agent in other_agents:
+            id = other_agent.agent_id
+            u[id] = other_agent.actor_network(o[id])
+
         ########### TODO: Calculate the actor loss (0.5 point) ###########
-        actor_loss = _
+        actor_loss = -torch.mean(self.critic_network(o, u))
         ########### END TODO ############################
         # update the network
         self.actor_optim.zero_grad()
@@ -1189,7 +1254,7 @@ class MADDPG:
         else:
             inputs = torch.tensor(o, dtype=torch.float32).unsqueeze(0)
             ########### TODO: Take action based on the actor network (0.5 point) ###########
-            u = _
+            u = self.actor_network(inputs).numpy() + np.random.normal(loc=0, scale=noise_rate)
             ########### END TODO ############################
         return u.copy()
 
