@@ -1402,6 +1402,7 @@ for time_step in tqdm(range(time_steps)):
             agent.learn(transitions, other_agents)
 
     if time_step == 0 or time_step % evaluate_rate == 0:
+        print(f'time_step: {time_step}')
         mean_return_eval = evaluate(env, agents, n_agents,
                                     evaluate_episodes, evaluate_episode_len)
         returns.append(mean_return_eval)
