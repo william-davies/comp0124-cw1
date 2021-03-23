@@ -1601,9 +1601,9 @@ class DuellingDQNAgent:
         self.gamma = 0.95
         self.action_shape = action_shape
 
-        self.DQN = DuellingDQN(obs_shape, n_actions)
-        self.target_DQN = copy.deepcopy(self.DQN)  # copy weights
-        self.optimizer = torch.optim.Adam(self.DQN.parameters())
+        self.online_DQN = DuellingDQN(obs_shape, n_actions)
+        self.target_DQN = copy.deepcopy(self.online_DQN)  # copy weights
+        self.optimizer = torch.optim.Adam(self.online_DQN.parameters())
         self.MSE_loss = nn.MSELoss()
 
     def select_action(self, observation, epsilon):
@@ -1617,10 +1617,10 @@ class DuellingDQNAgent:
 
         """
         if np.random.uniform() < epsilon:
-            action = np.random.choice(a=self.DQN.n_actions)
+            action = np.random.choice(a=self.online_DQN.n_actions)
         else:
             inputs = torch.tensor(observation, dtype=torch.float32).unsqueeze(0)
-            Q_values = self.DQN.forward(inputs)
+            Q_values = self.online_DQN.forward(inputs)
             action = torch.argmax(Q_values).item()
         return action
 
@@ -1638,6 +1638,8 @@ class DuellingDQNAgent:
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
+
+        self._soft_update_target_network()
     
     def compute_loss(self, local_batch):
         """
@@ -1656,7 +1658,7 @@ class DuellingDQNAgent:
         r = torch.FloatTensor(r)
         o_next = torch.FloatTensor(o_next)
 
-        current_Q = self.DQN.forward(observation=o)
+        current_Q = self.online_DQN.forward(observation=o)
         current_Q = current_Q.gather(1, u)  # filter by action taken
         current_Q = current_Q.squeeze(1)
 
@@ -1665,6 +1667,12 @@ class DuellingDQNAgent:
 
         loss = self.MSE_loss(current_Q, target_Q)
         return loss
+
+    def _soft_update_target_network(self):
+        for target_param, online_param in zip(self.online_DQN.parameters(),
+                                              self.target_DQN.parameters()):
+            new_target_param = self.tau*online_param + (1 - self.tau)*target_param
+            target_param.data.copy_(new_target_param)
 
 
 class DuellingDQN(nn.Module):
