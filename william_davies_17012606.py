@@ -1528,24 +1528,28 @@ def wrap_env(env):
 """
 
 # %%
-# env = gym.make("Switch2-v0")  # Use "Switch4-v0" for the Switch-4 game
-# env = Monitor(env, directory='recordings', force=True)
-#
-# done_n = [False for _ in range(env.n_agents)]
-# ep_reward = 0
-#
-# obs_n = env.reset()
-# timestep = 0
-# while not all(done_n):
-#     timestep += 1
-#     obs_n, reward_n, done_n, info = env.step(env.action_space.sample())
-#     ep_reward += sum(reward_n)
-#     # env.render()
-# env.close()
-# # To improve the training efficiency, render() is not necessary during the training.
-# # We provide the render and video code here just want to demonstrate how to debugging and analysis.
-# # show_video()
-# breakpoint = 1
+env = gym.make("Switch2-v0")  # Use "Switch4-v0" for the Switch-4 game
+env = Monitor(env, directory='recordings', force=True)
+
+done_n = [False for _ in range(env.n_agents)]
+ep_reward = 0
+
+obs_n = env.reset()
+timestep = 0
+while not all(done_n):
+    timestep += 1
+    print(f'timestep: {timestep}')
+    print(f'obs_n: {obs_n}')
+    actions = env.action_space.sample()
+    print(f'actions: {actions}')
+    obs_n, reward_n, done_n, info = env.step(actions)
+    ep_reward += sum(reward_n)
+    # env.render()
+env.close()
+# To improve the training efficiency, render() is not necessary during the training.
+# We provide the render and video code here just want to demonstrate how to debugging and analysis.
+# show_video()
+breakpoint = 1
 
 # %%
 """
@@ -1590,14 +1594,14 @@ class SwitchBuffer(Buffer):
 
 
 class DuellingDQNAgent:
-    def __init__(self, n_agents, agent_id, obs_shape=2, action_shape=1):
+    def __init__(self, n_agents, agent_id, n_actions, obs_shape=2, action_shape=1):
         self.n_agents = n_agents
         self.agent_id = agent_id
-        self.action_shape = action_shape
         self.tau = 0.01
         self.gamma = 0.95
+        self.action_shape = action_shape
 
-        self.DQN = DuellingDQN(obs_shape, self.action_shape)
+        self.DQN = DuellingDQN(obs_shape, n_actions)
         self.target_DQN = copy.deepcopy(self.DQN)  # copy weights
         self.optimizer = torch.optim.Adam(self.DQN.parameters())
         self.MSE_loss = nn.MSELoss()
@@ -1613,11 +1617,11 @@ class DuellingDQNAgent:
 
         """
         if np.random.uniform() < epsilon:
-            action = np.random.choice(a=self.DQN.n_actions, size=self.action_shape)
+            action = torch.randint(high=self.DQN.n_actions, size=(self.action_shape, ))[0]
         else:
             inputs = torch.tensor(observation, dtype=torch.float32).unsqueeze(0)
-            Q_values = self.DQN(inputs)
-            action = np.argmax(Q_values)
+            Q_values = self.DQN.forward(inputs)
+            action = torch.argmax(Q_values)
         return action
 
     def train(self, batch):
@@ -1656,6 +1660,7 @@ class DuellingDQNAgent:
 
         """
         current_Q = self.DQN.forward(observation=o)
+        current_Q = current_Q.squeeze(1)
 
         next_Q = self.target_DQN.forward(observation=o_next)
         target_Q = r + self.gamma*torch.max(next_Q)
@@ -1699,48 +1704,50 @@ class DuellingDQN(nn.Module):
 
 
 env = gym.make("Switch2-v0")  # Use "Switch4-v0" for the Switch-4 game
-env = Monitor(env, directory='recordings', force=True)
+# env = Monitor(env, directory='recordings', force=True)
 n_agents = env.n_agents
-agents = [DuellingDQNAgent(n_agents, i, obs_shape=2, action_shape=1) for
+agents = [DuellingDQNAgent(n_agents, i, obs_shape=2, n_actions=env.action_space[0].n) for
           i in range(n_agents)]
 buffer = SwitchBuffer(n_agents=env.n_agents)
 batch_size = 256
 
 ep_reward = 0
 obs_n = env.reset()
-epsilon = 0.001
+epsilon = 0.1
 
-episodes = 20
+episodes = 1
 
 for i_episode in range(episodes):
-    obs_n = env.reset()
-    done_n = [False] * n_agents
-    timestep = 0
-    while not all(done_n):
-        timestep += 1
+  timestep = 0
+  obs_n = env.reset()
+  done_n = [False] * n_agents
+  print(f'episode: {i_episode+1}')
+  while not all(done_n):
+    timestep += 1
+    print(f'timestep: {timestep}')
+    print(obs_n)
+    actions = []
+    with torch.no_grad():
+        for agent_id, agent in enumerate(agents):
+            action = agent.select_action(obs_n[agent_id], epsilon)
+            actions.append(action)
+    print(actions)
+    obs_n_next, reward_n, done_n, _ = env.step(actions)
+    buffer.store_episode(obs_n[:n_agents], actions,
+                          reward_n[:n_agents], obs_n_next[:n_agents])
 
-        actions = []
-        with torch.no_grad():
-            for agent_id, agent in enumerate(agents):
-                action = agent.select_action(obs_n[agent_id], epsilon)
-                actions.append(action)
+    obs_n = obs_n_next
 
-        obs_n_next, reward_n, done_n, _ = env.step(actions)
-        buffer.store_episode(obs_n[:n_agents], actions,
-                             reward_n[:n_agents], obs_n_next[:n_agents])
-
-        obs_n = obs_n_next
-
-        if buffer.current_size >= batch_size:
-            transitions = buffer.sample(batch_size)
-            for agent in agents:
-                other_agents = agents.copy()
-                other_agents.remove(agent)
-                agent.train(transitions)
-
-        env.render()
+    if buffer.current_size >= batch_size:
+        transitions = buffer.sample(batch_size)
+        for agent in agents:
+            other_agents = agents.copy()
+            other_agents.remove(agent)
+            agent.train(transitions)
+    # env.render()
 env.close()
 
+breakpoint = 1
 
 # %%
 """
