@@ -1016,83 +1016,83 @@ the Matrix Game, the Stochastic Game, the Nonzero-sum Game and Deep Multi-Agent 
 # """
 #
 # # %%
-# import numpy as np
-# import gym
-#
-# class CournotDuopoly(gym.Env):
-#     def __init__(self, agent_num=2, action_range=(-1., 1.)):
-#         self.agent_num = agent_num
-#         self.action_space = gym.spaces.Box(low=-1.0, high=1.0, shape=(1,))
-#         self.rewards = np.zeros((self.agent_num,))
-#         self.t = 0
-#
-#         self.alpha = 1.5
-#         self.beta = 1.0
-#         self.gamma = -0.5
-#
-#         def payoff_n_cournot(action_n, i):
-#             """
-#             Define the payoff function R_i(a_i,a_{-i}).
-#             :param action_n: (nd.array) a list of all agents' actions, shape is (agent_num,)
-#             :param i: agent index
-#             :return: R_i(a_i,a_{-i})
-#             """
-#             ########### TODO: Compute R_i(a_i,a_{-i}) (1 point) ###########
-#             g = action_n[i] * (self.alpha - self.beta*np.sum(action_n))
-#             w = self.gamma * action_n[i]
-#             r = g + w
-#             ########### END TODO ############################
-#             return r
-#
-#         def payoff_n_cournot_derivative(action_n, i):
-#             """
-#             Define the partial derivative of the payoff function R_i(a_i,a_{-i}) w.r.t. a_i.
-#             :param action_n: (nd.array) a list of all agents' actions, shape is (agent_num,)
-#             :param i: agent index
-#             :return: \partial R_i(a_i,a_{-i}) / \partial a_i
-#             """
-#             ########### TODO: Compute \partial R_i(a_i,a_{-i}) / \partial a_i (1 point) ###########
-#             dr = self.alpha - self.beta*(np.sum(action_n) + action_n[i]) + self.gamma
-#             ########### END TODO ############################
-#             return dr
-#
-#         self.payoff = payoff_n_cournot
-#         self.payoff_n_derivative = payoff_n_cournot_derivative
-#
-#     def step(self, action_n):
-#         """
-#         Define the environment step function.
-#         :param action_n: (nd.array) a list of all agents' actions, shape is (agent_num,)
-#         :return: state_n: (nd.array) a list of all agents' actions, shape is (agent_num,)
-#         :return: reward_n: (nd.array) a list of all agents' states, shape is (agent_num,)
-#         :return: done_n: (nd.array) a list of all agents' done status, shape is (agent_num,)
-#         :return: info: (dict) a dictionary of customized information
-#         """
-#         actions = np.array(action_n).reshape((self.agent_num,))
-#         reward_n = np.zeros((self.agent_num,))
-#         payoff_derivative_n = np.zeros((self.agent_num,))
-#         for i in range(self.agent_num):
-#             payoff_derivative_n[i] = self.payoff_n_derivative(actions, i)
-#             reward_n[i] = self.payoff(actions, i)
-#         self.rewards = reward_n
-#         state_n = np.array(list([[0.0 * i] for i in range(self.agent_num)]))
-#         info = {'reward_n': reward_n, 'reward_n_derivative': payoff_derivative_n}
-#         done_n = np.array([True] * self.agent_num)
-#         self.t += 1
-#         # print("state_n, reward_n, done_n, info", state_n, reward_n, done_n, info)
-#         return state_n, reward_n, done_n, info
-#
-#     def reset(self):
-#         return np.array(list([[0.0 * i] for i in range(self.agent_num)]))
-#
-#     def get_rewards(self):
-#         return self.rewards
-#
-#     def render(self, mode="human", close=False):
-#         pass
-#
-#     def terminate(self):
-#         pass
+import numpy as np
+import gym
+
+class CournotDuopoly(gym.Env):
+    def __init__(self, agent_num=2, action_range=(-1., 1.)):
+        self.agent_num = agent_num
+        self.action_space = gym.spaces.Box(low=-1.0, high=1.0, shape=(1,))
+        self.rewards = np.zeros((self.agent_num,))
+        self.t = 0
+
+        self.alpha = 1.5
+        self.beta = 1.0
+        self.gamma = -0.5
+
+        def payoff_n_cournot(action_n, i):
+            """
+            Define the payoff function R_i(a_i,a_{-i}).
+            :param action_n: (nd.array) a list of all agents' actions, shape is (agent_num,)
+            :param i: agent index
+            :return: R_i(a_i,a_{-i})
+            """
+            ########### TODO: Compute R_i(a_i,a_{-i}) (1 point) ###########
+            g = action_n[i] * (self.alpha - self.beta*np.sum(action_n))
+            w = self.gamma * action_n[i]
+            r = g + w
+            ########### END TODO ############################
+            return r
+
+        def payoff_n_cournot_derivative(action_n, i):
+            """
+            Define the partial derivative of the payoff function R_i(a_i,a_{-i}) w.r.t. a_i.
+            :param action_n: (nd.array) a list of all agents' actions, shape is (agent_num,)
+            :param i: agent index
+            :return: \partial R_i(a_i,a_{-i}) / \partial a_i
+            """
+            ########### TODO: Compute \partial R_i(a_i,a_{-i}) / \partial a_i (1 point) ###########
+            dr = self.alpha - self.beta*(np.sum(action_n) + action_n[i]) + self.gamma
+            ########### END TODO ############################
+            return dr
+
+        self.payoff = payoff_n_cournot
+        self.payoff_n_derivative = payoff_n_cournot_derivative
+
+    def step(self, action_n):
+        """
+        Define the environment step function.
+        :param action_n: (nd.array) a list of all agents' actions, shape is (agent_num,)
+        :return: state_n: (nd.array) a list of all agents' actions, shape is (agent_num,)
+        :return: reward_n: (nd.array) a list of all agents' states, shape is (agent_num,)
+        :return: done_n: (nd.array) a list of all agents' done status, shape is (agent_num,)
+        :return: info: (dict) a dictionary of customized information
+        """
+        actions = np.array(action_n).reshape((self.agent_num,))
+        reward_n = np.zeros((self.agent_num,))
+        payoff_derivative_n = np.zeros((self.agent_num,))
+        for i in range(self.agent_num):
+            payoff_derivative_n[i] = self.payoff_n_derivative(actions, i)
+            reward_n[i] = self.payoff(actions, i)
+        self.rewards = reward_n
+        state_n = np.array(list([[0.0 * i] for i in range(self.agent_num)]))
+        info = {'reward_n': reward_n, 'reward_n_derivative': payoff_derivative_n}
+        done_n = np.array([True] * self.agent_num)
+        self.t += 1
+        # print("state_n, reward_n, done_n, info", state_n, reward_n, done_n, info)
+        return state_n, reward_n, done_n, info
+
+    def reset(self):
+        return np.array(list([[0.0 * i] for i in range(self.agent_num)]))
+
+    def get_rewards(self):
+        return self.rewards
+
+    def render(self, mode="human", close=False):
+        pass
+
+    def terminate(self):
+        pass
 #
 #
 # # %%
@@ -1624,31 +1624,22 @@ class DuellingDQNAgent:
             action = torch.argmax(Q_values).item()
         return action
 
-    def train(self, batch):
+    def train(self, local_batch):
         """
         Train on experience replay batch.
         Args:
-            batch:
+            local_batch:
 
         Returns:
 
         """
-        for key in batch.keys():
-            batch[key] = torch.tensor(batch[key], dtype=torch.float32)
-        r = batch['r_%d' % self.agent_id]
-        o, u, o_next = [], [], []
-        for agent_id in range(self.n_agents):
-            o.append(batch['o_%d' % agent_id])
-            u.append(batch['u_%d' % agent_id])
-            o_next.append(batch['o_next_%d' % agent_id])
-
-        loss = self.compute_loss(o=o[self.agent_id], o_next=o_next[self.agent_id], r=r)
+        loss = self.compute_loss(local_batch)
 
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
     
-    def compute_loss(self, o, o_next, r):
+    def compute_loss(self, local_batch):
         """
         Compute loss between current DQN and target DQN networks.
         Args:
@@ -1659,7 +1650,14 @@ class DuellingDQNAgent:
         Returns:
 
         """
+        o, u, r, o_next = local_batch['o_%d' % self.agent_id], local_batch['u_%d' % self.agent_id], local_batch['r_%d' % self.agent_id], local_batch['o_next_%d' % self.agent_id]
+        o = torch.FloatTensor(o)
+        u = torch.LongTensor(u)
+        r = torch.FloatTensor(r)
+        o_next = torch.FloatTensor(o_next)
+
         current_Q = self.DQN.forward(observation=o)
+        current_Q = current_Q.gather(1, u)  # filter by action taken
         current_Q = current_Q.squeeze(1)
 
         next_Q = self.target_DQN.forward(observation=o_next)
@@ -1715,7 +1713,7 @@ ep_reward = 0
 obs_n = env.reset()
 epsilon = 0.1
 
-episodes = 1
+episodes = 6
 
 for i_episode in range(episodes):
   timestep = 0
@@ -1739,9 +1737,10 @@ for i_episode in range(episodes):
     obs_n = obs_n_next
 
     if buffer.current_size >= batch_size:
-        transitions = buffer.sample(batch_size)
+        batch = buffer.sample(batch_size)
         for agent in agents:
-            agent.train(transitions)
+            local_batch = {k: v for k, v in batch.items() if k.endswith(str(agent.agent_id))}
+            agent.train(local_batch)
     # env.render()
 env.close()
 
