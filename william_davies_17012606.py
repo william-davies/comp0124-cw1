@@ -997,117 +997,117 @@ the Matrix Game, the Stochastic Game, the Nonzero-sum Game and Deep Multi-Agent 
 # """
 # Your answer here.
 # """
-
-# %%
-"""
-#### TODO: Set up Cournot Duopoly game. (2 points)
-
-"""
-
-# %%
-"""
-
-Suppose that 
-$$
-g_i=a_i(\alpha -\beta\sum_{j\in\mathcal{N}}a_j),
-w_i=\gamma a_i.
-$$
-We choose $A_i=1.0, \forall i\in\mathcal{N}$ and $\alpha=1.5, \beta=1.0, \gamma=-0.5$.
-"""
-
-# %%
-import numpy as np
-import gym
-
-class CournotDuopoly(gym.Env):
-    def __init__(self, agent_num=2, action_range=(-1., 1.)):
-        self.agent_num = agent_num
-        self.action_space = gym.spaces.Box(low=-1.0, high=1.0, shape=(1,))
-        self.rewards = np.zeros((self.agent_num,))
-        self.t = 0
-
-        self.alpha = 1.5
-        self.beta = 1.0
-        self.gamma = -0.5
-
-        def payoff_n_cournot(action_n, i):
-            """
-            Define the payoff function R_i(a_i,a_{-i}).
-            :param action_n: (nd.array) a list of all agents' actions, shape is (agent_num,)
-            :param i: agent index
-            :return: R_i(a_i,a_{-i})
-            """
-            ########### TODO: Compute R_i(a_i,a_{-i}) (1 point) ###########
-            g = action_n[i] * (self.alpha - self.beta*np.sum(action_n))
-            w = self.gamma * action_n[i]
-            r = g + w
-            ########### END TODO ############################
-            return r
-
-        def payoff_n_cournot_derivative(action_n, i):
-            """
-            Define the partial derivative of the payoff function R_i(a_i,a_{-i}) w.r.t. a_i.
-            :param action_n: (nd.array) a list of all agents' actions, shape is (agent_num,)
-            :param i: agent index
-            :return: \partial R_i(a_i,a_{-i}) / \partial a_i
-            """
-            ########### TODO: Compute \partial R_i(a_i,a_{-i}) / \partial a_i (1 point) ###########
-            dr = self.alpha - self.beta*(np.sum(action_n) + action_n[i]) + self.gamma
-            ########### END TODO ############################
-            return dr
-        
-        self.payoff = payoff_n_cournot
-        self.payoff_n_derivative = payoff_n_cournot_derivative
-
-    def step(self, action_n):
-        """
-        Define the environment step function.
-        :param action_n: (nd.array) a list of all agents' actions, shape is (agent_num,)
-        :return: state_n: (nd.array) a list of all agents' states, shape is (agent_num,)
-        :return: reward_n: (nd.array) a list of all agents' rewards, shape is (agent_num,)
-        :return: done_n: (nd.array) a list of all agents' done status, shape is (agent_num,)
-        :return: info: (dict) a dictionary of customized information
-        """
-        actions = np.array(action_n).reshape((self.agent_num,))
-        reward_n = np.zeros((self.agent_num,))
-        payoff_derivative_n = np.zeros((self.agent_num,))
-        for i in range(self.agent_num):
-            payoff_derivative_n[i] = self.payoff_n_derivative(actions, i)
-            reward_n[i] = self.payoff(actions, i)
-        self.rewards = reward_n
-        state_n = np.array(list([[0.0 * i] for i in range(self.agent_num)]))
-        info = {'reward_n': reward_n, 'reward_n_derivative': payoff_derivative_n}
-        done_n = np.array([True] * self.agent_num)
-        self.t += 1
-        # print("state_n, reward_n, done_n, info", state_n, reward_n, done_n, info)
-        return state_n, reward_n, done_n, info
-
-    def reset(self):
-        return np.array(list([[0.0 * i] for i in range(self.agent_num)]))
-
-    def get_rewards(self):
-        return self.rewards
-    
-    def render(self, mode="human", close=False):
-        pass
-
-    def terminate(self):
-        pass
-
-
-# %%
-"""
-#### TODO: Implement MADDPG agents to play the Cournot Duopoly Game. (3 points)
-
-"""
-
-# %%
-"""
-Implement the MADDPG algorithm presented in the paper:
-[Multi-Agent Actor-Critic for Mixed Cooperative-Competitive Environments](https://arxiv.org/pdf/1706.02275.pdf).
-"""
-
-# %%
+#
+# # %%
+# """
+# #### TODO: Set up Cournot Duopoly game. (2 points)
+#
+# """
+#
+# # %%
+# """
+#
+# Suppose that
+# $$
+# g_i=a_i(\alpha -\beta\sum_{j\in\mathcal{N}}a_j),
+# w_i=\gamma a_i.
+# $$
+# We choose $A_i=1.0, \forall i\in\mathcal{N}$ and $\alpha=1.5, \beta=1.0, \gamma=-0.5$.
+# """
+#
+# # %%
+# import numpy as np
+# import gym
+#
+# class CournotDuopoly(gym.Env):
+#     def __init__(self, agent_num=2, action_range=(-1., 1.)):
+#         self.agent_num = agent_num
+#         self.action_space = gym.spaces.Box(low=-1.0, high=1.0, shape=(1,))
+#         self.rewards = np.zeros((self.agent_num,))
+#         self.t = 0
+#
+#         self.alpha = 1.5
+#         self.beta = 1.0
+#         self.gamma = -0.5
+#
+#         def payoff_n_cournot(action_n, i):
+#             """
+#             Define the payoff function R_i(a_i,a_{-i}).
+#             :param action_n: (nd.array) a list of all agents' actions, shape is (agent_num,)
+#             :param i: agent index
+#             :return: R_i(a_i,a_{-i})
+#             """
+#             ########### TODO: Compute R_i(a_i,a_{-i}) (1 point) ###########
+#             g = action_n[i] * (self.alpha - self.beta*np.sum(action_n))
+#             w = self.gamma * action_n[i]
+#             r = g + w
+#             ########### END TODO ############################
+#             return r
+#
+#         def payoff_n_cournot_derivative(action_n, i):
+#             """
+#             Define the partial derivative of the payoff function R_i(a_i,a_{-i}) w.r.t. a_i.
+#             :param action_n: (nd.array) a list of all agents' actions, shape is (agent_num,)
+#             :param i: agent index
+#             :return: \partial R_i(a_i,a_{-i}) / \partial a_i
+#             """
+#             ########### TODO: Compute \partial R_i(a_i,a_{-i}) / \partial a_i (1 point) ###########
+#             dr = self.alpha - self.beta*(np.sum(action_n) + action_n[i]) + self.gamma
+#             ########### END TODO ############################
+#             return dr
+#
+#         self.payoff = payoff_n_cournot
+#         self.payoff_n_derivative = payoff_n_cournot_derivative
+#
+#     def step(self, action_n):
+#         """
+#         Define the environment step function.
+#         :param action_n: (nd.array) a list of all agents' actions, shape is (agent_num,)
+#         :return: state_n: (nd.array) a list of all agents' actions, shape is (agent_num,)
+#         :return: reward_n: (nd.array) a list of all agents' states, shape is (agent_num,)
+#         :return: done_n: (nd.array) a list of all agents' done status, shape is (agent_num,)
+#         :return: info: (dict) a dictionary of customized information
+#         """
+#         actions = np.array(action_n).reshape((self.agent_num,))
+#         reward_n = np.zeros((self.agent_num,))
+#         payoff_derivative_n = np.zeros((self.agent_num,))
+#         for i in range(self.agent_num):
+#             payoff_derivative_n[i] = self.payoff_n_derivative(actions, i)
+#             reward_n[i] = self.payoff(actions, i)
+#         self.rewards = reward_n
+#         state_n = np.array(list([[0.0 * i] for i in range(self.agent_num)]))
+#         info = {'reward_n': reward_n, 'reward_n_derivative': payoff_derivative_n}
+#         done_n = np.array([True] * self.agent_num)
+#         self.t += 1
+#         # print("state_n, reward_n, done_n, info", state_n, reward_n, done_n, info)
+#         return state_n, reward_n, done_n, info
+#
+#     def reset(self):
+#         return np.array(list([[0.0 * i] for i in range(self.agent_num)]))
+#
+#     def get_rewards(self):
+#         return self.rewards
+#
+#     def render(self, mode="human", close=False):
+#         pass
+#
+#     def terminate(self):
+#         pass
+#
+#
+# # %%
+# """
+# #### TODO: Implement MADDPG agents to play the Cournot Duopoly Game. (3 points)
+#
+# """
+#
+# # %%
+# """
+# Implement the MADDPG algorithm presented in the paper:
+# [Multi-Agent Actor-Critic for Mixed Cooperative-Competitive Environments](https://arxiv.org/pdf/1706.02275.pdf).
+# """
+#
+# # %%
 import numpy as np
 import torch
 import torch.nn as nn
@@ -1146,8 +1146,8 @@ class Critic(nn.Module):
         x = F.relu(self.fc3(x))
         q_value = self.q_out(x)
         return q_value
-
-
+#
+#
 class MADDPG:
     def __init__(self, n_agents, agent_id, obs_shape=1, action_shape=1):
         self.n_agents = n_agents
@@ -1260,15 +1260,15 @@ class MADDPG:
 
     def learn(self, transitions, other_agents):
         self.train(transitions, other_agents)
-
-
-# %%
-"""
-#### Some useful scripts (please execute).
-
-"""
-
-# %%
+#
+#
+# # %%
+# """
+# #### Some useful scripts (please execute).
+#
+# """
+#
+# # %%
 import threading
 
 class Buffer:
@@ -1296,7 +1296,7 @@ class Buffer:
                 self.buffer['u_%d' % i][idxs] = u[i]
                 self.buffer['r_%d' % i][idxs] = r[i]
                 self.buffer['o_next_%d' % i][idxs] = o_next[i]
-    
+
     # sample the data from the replay buffer
     def sample(self, batch_size):
         temp_buffer = {}
@@ -1320,114 +1320,116 @@ class Buffer:
         if inc == 1:
             idx = idx[0]
         return idx
-
-def evaluate(env, agents, agent_num, evaluate_episodes, evaluate_episode_len):
-    returns = []
-    for episode in range(evaluate_episodes):
-        # reset the environment
-        s = env.reset()
-        rewards_n = np.zeros(agent_num)
-        rs = []
-        alist = []
-        rewards1 = 0
-        for time_step in range(evaluate_episode_len):
-            actions = []
-            with torch.no_grad():
-                for agent_id, agent in enumerate(agents):
-                    action = agent.select_action(s[agent_id], 0, 0)
-                    actions.append(action)
-            s_next, r, done, info = env.step(actions)
-            if type(info['reward_n']) is list:
-                rewards_n += np.sum(info['reward_n'])
-            else:
-                rewards_n += info['reward_n'].squeeze()
-
-            s = s_next
-        returns.append(rewards_n)
-    s = env.reset()
-    mean_return = sum(returns) / evaluate_episodes
-
-    return mean_return
-
-
-# %%
-"""
-#### Test your implemented MADDPG agent in the Cournot Duopoly Game.
-
-"""
-
-# %%
-from tqdm import tqdm
-import matplotlib.pyplot as plt
-
-noise = 0.1
-epsilon = 0.1
-episode_limit = 100
-n_agents = 5
-batch_size = 256
-evaluate_rate = 1000
-time_steps = 20000
-evaluate_episode_len = 100
-evaluate_episodes = 100
-env = CournotDuopoly(agent_num=n_agents)
-agents = [MADDPG(n_agents, i, obs_shape=1, action_shape=1) for 
-          i in range(n_agents)]
-buffer = Buffer(n_agents=n_agents)
-
-returns = []
-done = None
-mean_return_eval = 0.
-for time_step in tqdm(range(time_steps)):
-    if time_step % episode_limit == 0 or np.all(done):
-        s = env.reset()
-    u = []
-    actions = []
-    with torch.no_grad():
-        for agent_id, agent in enumerate(agents):
-            action = agent.select_action(s[agent_id], noise, epsilon)
-            u.append(action)
-            actions.append(action)
-
-    s_next, r, done, info = env.step(actions)
-    buffer.store_episode(s[:n_agents], u,
-                         r[:n_agents], s_next[:n_agents])
-
-    s = s_next
-
-    if buffer.current_size >= batch_size:
-        transitions = buffer.sample(batch_size)
-        for agent in agents:
-            other_agents = agents.copy()
-            other_agents.remove(agent)
-            agent.learn(transitions, other_agents)
-
-    if time_step == 0 or time_step % evaluate_rate == 0:
-        print(f'time_step: {time_step}')
-        mean_return_eval = evaluate(env, agents, n_agents,
-                                    evaluate_episodes, evaluate_episode_len)
-        returns.append(mean_return_eval)
-        print(mean_return_eval)
-plt.figure()
-plt.plot(range(len(returns)), np.array(returns).sum(-1))
-plt.xlabel('episode * ' + str(evaluate_rate / episode_limit))
-plt.ylabel('average returns')
-plt.tight_layout()
-plt.show()
-
-# %%
-"""
-#### TODO: Analyze the performance of your implemented MADDPG algorithm. Describe the reason if it's not playing well.(2 points)
-"""
-
-# %%
-"""
-*Hint: Cournot Monopoly is a nonzero-sum game.*
-"""
-
-# %%
-"""
-Your answer here.
-"""
+#
+# def evaluate(env, agents, agent_num, evaluate_episodes, evaluate_episode_len):
+#     returns = []
+#     for episode in range(evaluate_episodes):
+#         # reset the environment
+#         s = env.reset()
+#         rewards_n = np.zeros(agent_num)
+#         rs = []
+#         alist = []
+#         rewards1 = 0
+#         for time_step in range(evaluate_episode_len):
+#             actions = []
+#             with torch.no_grad():
+#                 for agent_id, agent in enumerate(agents):
+#                     action = agent.select_action(s[agent_id], 0, 0)
+#                     actions.append(action)
+#             s_next, r, done, info = env.step(actions)
+#             if type(info['reward_n']) is list:
+#                 rewards_n += np.sum(info['reward_n'])
+#             else:
+#                 rewards_n += info['reward_n'].squeeze()
+#
+#             s = s_next
+#         returns.append(rewards_n)
+#     s = env.reset()
+#     mean_return = sum(returns) / evaluate_episodes
+#
+#     return mean_return
+#
+#
+# # %%
+# """
+# #### Test your implemented MADDPG agent in the Cournot Duopoly Game.
+#
+# """
+#
+# # %%
+# from tqdm import tqdm
+# import matplotlib.pyplot as plt
+#
+# noise = 0.1
+# epsilon = 0.1
+# episode_limit = 100
+# n_agents = 5
+# batch_size = 256
+# evaluate_rate = 1000
+# time_steps = 20000
+# evaluate_episode_len = 100
+# evaluate_episodes = 100
+# env = CournotDuopoly(agent_num=n_agents)
+# agents = [MADDPG(n_agents, i, obs_shape=1, action_shape=1) for
+#           i in range(n_agents)]
+# buffer = Buffer(n_agents=n_agents)
+#
+# returns = []
+# done = None
+# mean_return_eval = 0.
+# for time_step in tqdm(range(time_steps)):
+#     if time_step % episode_limit == 0 or np.all(done):
+#         s = env.reset()
+#     u = []
+#     actions = []
+#     with torch.no_grad():
+#         for agent_id, agent in enumerate(agents):
+#             action = agent.select_action(s[agent_id], noise, epsilon)
+#             u.append(action)
+#             actions.append(action)
+#
+#     s_next, r, done, info = env.step(actions)
+#     buffer.store_episode(s[:n_agents], u,
+#                          r[:n_agents], s_next[:n_agents])
+#
+#     s = s_next
+#
+#     if buffer.current_size >= batch_size:
+#         transitions = buffer.sample(batch_size)
+#         for agent in agents:
+#             other_agents = agents.copy()
+#             other_agents.remove(agent)
+#             agent.learn(transitions, other_agents)
+#
+#     if time_step == 0 or time_step % evaluate_rate == 0:
+#         mean_return_eval = evaluate(env, agents, n_agents,
+#                                     evaluate_episodes, evaluate_episode_len)
+#         returns.append(mean_return_eval)
+#         print(mean_return_eval)
+# plt.figure()
+# plt.plot(range(len(returns)), np.array(returns).sum(-1))
+# plt.xlabel('episode * ' + str(evaluate_rate / episode_limit))
+# plt.ylabel('average returns')
+# plt.tight_layout()
+# plt.show()
+#
+# # %%
+# returns
+#
+# # %%
+# """
+# #### TODO: Analyze the performance of your implemented MADDPG algorithm. Describe the reason if it's not playing well.(2 points)
+# """
+#
+# # %%
+# """
+# *Hint: Cournot Monopoly is a nonzero-sum game.*
+# """
+#
+# # %%
+# """
+# My implemented MADDPG algorithm does not perform well. It actually performs very poorly. It does not seem to be learning over episodes.
+# """
 
 # %%
 """
@@ -1464,9 +1466,9 @@ The following command will download the required scripts and set up the environm
 """
 
 # %%
-# !rm -rf /content/ma-gym
+# !rm -rf ma-gym
 # !git clone https://github.com/koulanurag/ma-gym.git
-# %cd /content/ma-gym
+# %cd ma-gym
 # !pip install -q -e .
 # !apt-get install -y xvfb python-opengl x11-utils > /dev/null 2>&1
 # !pip install pyvirtualdisplay > /dev/null 2>&1
@@ -1488,10 +1490,14 @@ import io
 import base64
 from IPython.display import HTML
 from IPython import display as ipythondisplay
+from torch import nn
+import torch
+import numpy as np
+import copy
 
 from pyvirtualdisplay import Display
-display = Display(visible=0, size=(1400, 900))
-display.start()
+# display = Display(visible=0, size=(1400, 900))
+# display.start()
 
 """
 Utility functions to enable video recording of gym environment and displaying it
@@ -1499,22 +1505,22 @@ To enable video, just do "env = wrap_env(env)""
 """
 
 def show_video():
-  mp4list = glob.glob('video/*.mp4')
-  if len(mp4list) > 0:
-    mp4 = mp4list[0]
-    video = io.open(mp4, 'r+b').read()
-    encoded = base64.b64encode(video)
-    ipythondisplay.display(HTML(data='''<video alt="test" autoplay 
-                loop controls style="height: 400px;">
-                <source src="data:video/mp4;base64,{0}" type="video/mp4" />
-             </video>'''.format(encoded.decode('ascii'))))
-  else: 
-    print("Could not find video")
+    mp4list = glob.glob('video/*.mp4')
+    if len(mp4list) > 0:
+        mp4 = mp4list[0]
+        video = io.open(mp4, 'r+b').read()
+        encoded = base64.b64encode(video)
+        ipythondisplay.display(HTML(data='''<video alt="test" autoplay 
+                    loop controls style="height: 400px;">
+                    <source src="data:video/mp4;base64,{0}" type="video/mp4" />
+                 </video>'''.format(encoded.decode('ascii'))))
+    else: 
+        print("Could not find video")
     
 
 def wrap_env(env):
-  env = Monitor(env, './video', force=True)
-  return env
+    env = Monitor(env, './video', force=True)
+    return env
 
 # %%
 """
@@ -1522,19 +1528,24 @@ def wrap_env(env):
 """
 
 # %%
-env = wrap_env(gym.make("Switch2-v0")) # Use "Switch4-v0" for the Switch-4 game
-done_n = [False for _ in range(env.n_agents)]
-ep_reward = 0
-
-obs_n = env.reset()
-while not all(done_n):
-    obs_n, reward_n, done_n, info = env.step(env.action_space.sample())
-    ep_reward += sum(reward_n)
-    env.render()
-env.close()
-# To improve the training efficiency, render() is not necessary during the training.
-# We provide the render and video code here just want to demonstrate how to debugging and analysis.
-show_video()
+# env = gym.make("Switch2-v0")  # Use "Switch4-v0" for the Switch-4 game
+# env = Monitor(env, directory='recordings', force=True)
+#
+# done_n = [False for _ in range(env.n_agents)]
+# ep_reward = 0
+#
+# obs_n = env.reset()
+# timestep = 0
+# while not all(done_n):
+#     timestep += 1
+#     obs_n, reward_n, done_n, info = env.step(env.action_space.sample())
+#     ep_reward += sum(reward_n)
+#     # env.render()
+# env.close()
+# # To improve the training efficiency, render() is not necessary during the training.
+# # We provide the render and video code here just want to demonstrate how to debugging and analysis.
+# # show_video()
+# breakpoint = 1
 
 # %%
 """
@@ -1563,6 +1574,172 @@ Implement your own choice of any deep MARL algorithms to play the Switch2-v0 gam
 """
 
 # %%
+
+
+class SwitchBuffer(Buffer):
+    def __init__(self, n_agents=5):
+        """
+        Have to overwrite because the original buffer class has observations of dimension 1.
+        Args:
+            n_agents:
+        """
+        super().__init__(n_agents=n_agents)
+        for i in range(self.n_agents):
+            self.buffer['o_%d' % i] = np.empty([self.size, 2])
+            self.buffer['o_next_%d' % i] = np.empty([self.size, 2])
+
+
+class DuellingDQNAgent:
+    def __init__(self, n_agents, agent_id, obs_shape=2, action_shape=1):
+        self.n_agents = n_agents
+        self.agent_id = agent_id
+        self.action_shape = action_shape
+        self.tau = 0.01
+        self.gamma = 0.95
+
+        self.DQN = DuellingDQN(obs_shape, self.action_shape)
+        self.target_DQN = copy.deepcopy(self.DQN)  # copy weights
+        self.optimizer = torch.optim.Adam(self.DQN.parameters())
+        self.MSE_loss = nn.MSELoss()
+
+    def select_action(self, observation, epsilon):
+        """
+        Epsilon-greedy.
+        Args:
+            observation:
+            epsilon:
+
+        Returns:
+
+        """
+        if np.random.uniform() < epsilon:
+            action = np.random.choice(a=self.DQN.n_actions, size=self.action_shape)
+        else:
+            inputs = torch.tensor(observation, dtype=torch.float32).unsqueeze(0)
+            Q_values = self.DQN(inputs)
+            action = np.argmax(Q_values)
+        return action
+
+    def train(self, batch):
+        """
+        Train on experience replay batch.
+        Args:
+            batch:
+
+        Returns:
+
+        """
+        for key in batch.keys():
+            batch[key] = torch.tensor(batch[key], dtype=torch.float32)
+        r = batch['r_%d' % self.agent_id]
+        o, u, o_next = [], [], []
+        for agent_id in range(self.n_agents):
+            o.append(batch['o_%d' % agent_id])
+            u.append(batch['u_%d' % agent_id])
+            o_next.append(batch['o_next_%d' % agent_id])
+
+        loss = self.compute_loss(o=o[self.agent_id], o_next=o_next[self.agent_id], r=r)
+
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+    
+    def compute_loss(self, o, o_next, r):
+        """
+        Compute loss between current DQN and target DQN networks.
+        Args:
+            o:
+            o_next:
+            r:
+
+        Returns:
+
+        """
+        current_Q = self.DQN.forward(observation=o)
+
+        next_Q = self.target_DQN.forward(observation=o_next)
+        target_Q = r + self.gamma*torch.max(next_Q)
+
+        loss = self.MSE_loss(current_Q, target_Q)
+        return loss
+
+
+class DuellingDQN(nn.Module):
+    def __init__(self, observation_dim, n_actions):
+        super().__init__()
+        self.observation_dim = observation_dim
+        self.n_actions = n_actions
+
+        self.feature_layer = nn.Sequential(
+            nn.Linear(self.observation_dim, 128),
+            nn.ReLU(),
+            nn.Linear(128, 128),
+            nn.ReLU()
+        )
+
+        self.value_stream = nn.Sequential(
+            nn.Linear(128, 128),
+            nn.ReLU(),
+            nn.Linear(128, 1)
+        )
+
+        self.advantage_stream = nn.Sequential(
+            nn.Linear(128, 128),
+            nn.ReLU(),
+            nn.Linear(128, self.n_actions)
+        )
+
+    def forward(self, observation):
+        features = self.feature_layer(observation)
+        values = self.value_stream(features)
+        advantages = self.advantage_stream(features)
+        qvals = values + (advantages - advantages.mean())
+
+        return qvals
+
+
+env = gym.make("Switch2-v0")  # Use "Switch4-v0" for the Switch-4 game
+env = Monitor(env, directory='recordings', force=True)
+n_agents = env.n_agents
+agents = [DuellingDQNAgent(n_agents, i, obs_shape=2, action_shape=1) for
+          i in range(n_agents)]
+buffer = SwitchBuffer(n_agents=env.n_agents)
+batch_size = 256
+
+ep_reward = 0
+obs_n = env.reset()
+epsilon = 0.001
+
+episodes = 20
+
+for i_episode in range(episodes):
+    obs_n = env.reset()
+    done_n = [False] * n_agents
+    timestep = 0
+    while not all(done_n):
+        timestep += 1
+
+        actions = []
+        with torch.no_grad():
+            for agent_id, agent in enumerate(agents):
+                action = agent.select_action(obs_n[agent_id], epsilon)
+                actions.append(action)
+
+        obs_n_next, reward_n, done_n, _ = env.step(actions)
+        buffer.store_episode(obs_n[:n_agents], actions,
+                             reward_n[:n_agents], obs_n_next[:n_agents])
+
+        obs_n = obs_n_next
+
+        if buffer.current_size >= batch_size:
+            transitions = buffer.sample(batch_size)
+            for agent in agents:
+                other_agents = agents.copy()
+                other_agents.remove(agent)
+                agent.train(transitions)
+
+        env.render()
+env.close()
 
 
 # %%
