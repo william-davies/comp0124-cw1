@@ -1528,28 +1528,28 @@ def wrap_env(env):
 """
 
 # %%
-env = gym.make("Switch2-v0")  # Use "Switch4-v0" for the Switch-4 game
-env = Monitor(env, directory='recordings', force=True)
-
-done_n = [False for _ in range(env.n_agents)]
-ep_reward = 0
-
-obs_n = env.reset()
-timestep = 0
-while not all(done_n):
-    timestep += 1
-    print(f'timestep: {timestep}')
-    print(f'obs_n: {obs_n}')
-    actions = env.action_space.sample()
-    print(f'actions: {actions}')
-    obs_n, reward_n, done_n, info = env.step(actions)
-    ep_reward += sum(reward_n)
-    # env.render()
-env.close()
-# To improve the training efficiency, render() is not necessary during the training.
-# We provide the render and video code here just want to demonstrate how to debugging and analysis.
-# show_video()
-breakpoint = 1
+# env = gym.make("Switch2-v0")  # Use "Switch4-v0" for the Switch-4 game
+# env = Monitor(env, directory='recordings', force=True)
+#
+# done_n = [False for _ in range(env.n_agents)]
+# ep_reward = 0
+#
+# obs_n = env.reset()
+# timestep = 0
+# while not all(done_n):
+#     timestep += 1
+#     print(f'timestep: {timestep}')
+#     print(f'obs_n: {obs_n}')
+#     actions = env.action_space.sample()
+#     print(f'actions: {actions}')
+#     obs_n, reward_n, done_n, info = env.step(actions)
+#     ep_reward += sum(reward_n)
+#     # env.render()
+# env.close()
+# # To improve the training efficiency, render() is not necessary during the training.
+# # We provide the render and video code here just want to demonstrate how to debugging and analysis.
+# # show_video()
+# breakpoint = 1
 
 # %%
 """
@@ -1617,11 +1617,11 @@ class DuellingDQNAgent:
 
         """
         if np.random.uniform() < epsilon:
-            action = torch.randint(high=self.DQN.n_actions, size=(self.action_shape, ))[0]
+            action = np.random.choice(a=self.DQN.n_actions)
         else:
             inputs = torch.tensor(observation, dtype=torch.float32).unsqueeze(0)
             Q_values = self.DQN.forward(inputs)
-            action = torch.argmax(Q_values)
+            action = torch.argmax(Q_values).item()
         return action
 
     def train(self, batch):
@@ -1741,8 +1741,6 @@ for i_episode in range(episodes):
     if buffer.current_size >= batch_size:
         transitions = buffer.sample(batch_size)
         for agent in agents:
-            other_agents = agents.copy()
-            other_agents.remove(agent)
             agent.train(transitions)
     # env.render()
 env.close()
