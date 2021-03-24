@@ -1579,6 +1579,8 @@ Implement your own choice of any deep MARL algorithms to play the Switch2-v0 gam
 """
 
 # %%
+
+
 def add_timestep_obs(coordinates_list, timestep):
     """
     Add timestep observation.
@@ -1590,6 +1592,7 @@ def add_timestep_obs(coordinates_list, timestep):
 
     """
     return [[*coords, timestep] for coords in coordinates_list]
+
 
 class SwitchBuffer(Buffer):
     def __init__(self, obs_shape, n_agents=5):
@@ -1719,7 +1722,8 @@ class DuellingDQN(nn.Module):
 
         return qvals
 
-def switch_evaluate(env, env_max_steps, agents, n_agents, n_evaluation_episodes, epsilon, render=False):
+
+def switch_evaluate(env, max_timesteps, agents, n_agents, n_evaluation_episodes, epsilon, render=False):
     """
     Evaluate agents.
     Args:
@@ -1735,30 +1739,35 @@ def switch_evaluate(env, env_max_steps, agents, n_agents, n_evaluation_episodes,
     episode_n_agents_reached_targets = np.zeros(n_evaluation_episodes)
     for episode in range(n_evaluation_episodes):
         episode_reward = 0
-        episode_n_agents_reached_target = 0
+        reached_goal = np.zeros(n_agents, dtype=bool)
 
+        obs_n = env.reset()
         timestep = 0
-        obs_n = add_timestep_obs(coordinates_list=env.reset(), timestep=timestep)
+        obs_n = add_timestep_obs(coordinates_list=obs_n, timestep=timestep)
         done_n = [False] * n_agents
         while not all(done_n):
-            timestep += 1
-
             actions = select_actions(agents=agents, obs_n=obs_n, epsilon=epsilon)
 
             obs_n_next, reward_n, done_n, _ = env.step(actions)
+            timestep += 1
             obs_n_next = add_timestep_obs(obs_n_next, timestep)
             obs_n = obs_n_next
 
-            # at max_timesteps done_n is set to True for all n
-            if timestep == env_max_steps - 1:
-                episode_n_agents_reached_target = np.sum(done_n)
+            # N.B. at timestep == max_timesteps done_n are all set to True even if agents have not reached their goals
+            if timestep < max_timesteps:
+                reached_this_timestep = reached_goal != np.array(done_n)
+                if reached_this_timestep.any():
+                    reached_goal = np.array(done_n)
+                    print(f'[timestep {timestep}] Agent(s) that reached goal at this timestep: {reached_this_timestep.nonzero()[0]}')
+                    print(f'[timestep {timestep}] reward_n: {reward_n}')
 
             episode_reward += np.sum(reward_n)
-        episode_rewards[episode] = episode_reward
-        episode_n_agents_reached_targets[episode] = episode_n_agents_reached_target
 
-        if render:
-            env.render()
+            if render:
+                env.render()
+
+        episode_rewards[episode] = episode_reward
+        episode_n_agents_reached_targets[episode] = reached_goal.sum()
 
     mean_reward = np.mean(episode_rewards)
     mean_n_agents_reached_target = np.mean(episode_n_agents_reached_targets)
@@ -1812,60 +1821,65 @@ buffer = SwitchBuffer(n_agents=env.n_agents, obs_shape=obs_shape)
 batch_size = 256
 DOWN, LEFT, UP, RIGHT, NOOP = 0, 1, 2, 3, 4
 
-n_episodes = 1000
+n_episodes = 100
 
 training_rewards = np.zeros(n_episodes)
 training_n_agents_reached_target = np.zeros_like(training_rewards)
 
-greedy_evaluation_rate = 50  # evaluate every n episodes
-n_evaluation_episodes = 5
+greedy_evaluation_rate = 25  # evaluate every n episodes
+n_evaluation_episodes = 3
 greedy_evaluated_episodes = np.arange(start=0, stop=n_episodes, step=greedy_evaluation_rate)
 greedy_rewards = np.zeros_like(greedy_evaluated_episodes)
 greedy_n_agents_reached_target = np.zeros_like(greedy_evaluated_episodes)
 for i_episode in range(n_episodes):
     episode_reward = 0
+    reached_goal = np.zeros(n_agents, dtype=bool)
 
-    timestep = 1
-    obs_n = add_timestep_obs(coordinates_list=env.reset(), timestep=timestep)
+    obs_n = env.reset()
+    timestep = 0
+    obs_n = add_timestep_obs(coordinates_list=obs_n, timestep=timestep)
     done_n = [False] * n_agents
     print(f'episode: {i_episode+1}')
     while not all(done_n):
         # print(f'timestep: {timestep}')
 
         actions = select_actions(agents=agents, obs_n=obs_n, epsilon=get_epsilon(timestep))
-        actions[1] = NOOP
         # print(f'actions: {actions}')
 
         obs_n_next, reward_n, done_n, _ = env.step(actions)
         timestep += 1
         obs_n_next = add_timestep_obs(obs_n_next, timestep)
-        reward_to_store = [np.sum(reward_n)] * n_agents  # use joint reward to promote cooperation
+        reward_to_store = [np.sum(reward_n)] * n_agents  # to promote cooperation
         buffer.store_episode(obs_n[:n_agents], actions,
                               reward_to_store, obs_n_next[:n_agents])
 
         obs_n = obs_n_next
 
-        if timestep < max_timesteps and np.sum(reward_n) > 0:
-            print(f'reward_n: {reward_n}')
-
         if buffer.current_size >= batch_size:
             do_experience_replay(agents=agents, buffer=buffer)
 
-        if timestep == max_timesteps - 1:
-            training_n_agents_reached_target[i_episode] = np.sum(done_n)
-
-        if i_episode % greedy_evaluation_rate == 0:
-            mean_reward, mean_n_agents_reached_target = switch_evaluate(env=env,
-                                                                        env_max_steps=max_timesteps,
-                                                                        agents=agents,
-                                                                        n_agents=n_agents,
-                                                                        n_evaluation_episodes=n_evaluation_episodes,
-                                                                        epsilon=0)
-            greedy_rewards[i_episode // greedy_evaluation_rate] = mean_reward
-            greedy_n_agents_reached_target[i_episode // greedy_evaluation_rate] = mean_n_agents_reached_target
+        # N.B. at timestep == max_timesteps done_n are all set to True even if agents have not reached their goals
+        if timestep < max_timesteps:
+            reached_this_timestep = reached_goal != np.array(done_n)
+            if reached_this_timestep.any():
+                reached_goal = np.array(done_n)
+                print(f'[timestep {timestep}] Agent(s) that reached goal at this timestep: {reached_this_timestep.nonzero()[0]}')
+                print(f'[timestep {timestep}] reward_n: {reward_n}')
 
         episode_reward += sum(reward_n)
+
+    if i_episode % greedy_evaluation_rate == 0:
+        mean_reward, mean_n_agents_reached_target = switch_evaluate(env=env,
+                                                                    max_timesteps=max_timesteps,
+                                                                    agents=agents,
+                                                                    n_agents=n_agents,
+                                                                    n_evaluation_episodes=n_evaluation_episodes,
+                                                                    epsilon=0)
+        greedy_rewards[i_episode // greedy_evaluation_rate] = mean_reward
+        greedy_n_agents_reached_target[i_episode // greedy_evaluation_rate] = mean_n_agents_reached_target
+
     training_rewards[i_episode] = episode_reward
+    training_n_agents_reached_target[i_episode] = reached_goal.sum()
 env.close()
 
 breakpoint = 1
@@ -1884,7 +1898,7 @@ plt.ylabel('Number of agents reached target')
 plt.plot(greedy_evaluated_episodes, greedy_n_agents_reached_target)
 
 env = gym.make("Switch2-v0", max_steps=max_timesteps)  # Use "Switch4-v0" for the Switch-4 game
-switch_evaluate(env=env, env_max_steps=max_timesteps, agents=agents, n_agents=n_agents, n_evaluation_episodes=1, render=True)
+switch_evaluate(env=env, max_timesteps=max_timesteps, agents=agents, n_agents=n_agents, n_evaluation_episodes=1, render=True)
 env.close()
 
 show_video()
