@@ -1825,12 +1825,11 @@ greedy_n_agents_reached_target = np.zeros_like(greedy_evaluated_episodes)
 for i_episode in range(n_episodes):
     episode_reward = 0
 
-    timestep = 0
+    timestep = 1
     obs_n = add_timestep_obs(coordinates_list=env.reset(), timestep=timestep)
     done_n = [False] * n_agents
     print(f'episode: {i_episode+1}')
     while not all(done_n):
-        timestep += 1
         # print(f'timestep: {timestep}')
 
         actions = select_actions(agents=agents, obs_n=obs_n, epsilon=get_epsilon(timestep))
@@ -1838,9 +1837,11 @@ for i_episode in range(n_episodes):
         # print(f'actions: {actions}')
 
         obs_n_next, reward_n, done_n, _ = env.step(actions)
+        timestep += 1
         obs_n_next = add_timestep_obs(obs_n_next, timestep)
+        reward_to_store = [np.sum(reward_n)] * n_agents  # use joint reward to promote cooperation
         buffer.store_episode(obs_n[:n_agents], actions,
-                              reward_n[:n_agents], obs_n_next[:n_agents])
+                              reward_to_store, obs_n_next[:n_agents])
 
         obs_n = obs_n_next
 
