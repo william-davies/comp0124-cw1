@@ -1708,7 +1708,7 @@ class DuellingDQN(nn.Module):
 
         return qvals
 
-def switch_evaluate(env, env_max_steps, agents, n_agents, n_evaluation_episodes, ):
+def switch_evaluate(env, env_max_steps, agents, n_agents, n_evaluation_episodes, render=False):
     """
     Evaluate agents acting Greedily.
     Args:
@@ -1744,6 +1744,9 @@ def switch_evaluate(env, env_max_steps, agents, n_agents, n_evaluation_episodes,
             episode_reward += np.sum(reward_n)
         episode_rewards[episode] = episode_reward
         episode_n_agents_reached_targets[episode] = episode_n_agents_reached_target
+
+        if render:
+            env.render()
 
     mean_reward = np.mean(episode_rewards)
     mean_n_agents_reached_target = np.mean(episode_n_agents_reached_targets)
@@ -1806,7 +1809,6 @@ for i_episode in range(n_episodes):
     print(f'episode: {i_episode+1}')
     while not all(done_n):
         timestep += 1
-        print(f'timestep: {timestep}')
 
         actions = select_actions(agents=agents, obs_n=obs_n, epsilon=epsilon)
 
@@ -1834,6 +1836,12 @@ for i_episode in range(n_episodes):
 env.close()
 
 breakpoint = 1
+
+env = gym.make("Switch2-v0", max_steps=max_timesteps)  # Use "Switch4-v0" for the Switch-4 game
+switch_evaluate(env=env, env_max_steps=max_timesteps, agents=agents, n_agents=n_agents, n_evaluation_episodes=1, render=True)
+env.close()
+
+show_video()
 
 # %%
 """
