@@ -1578,10 +1578,20 @@ Implement your own choice of any deep MARL algorithms to play the Switch2-v0 gam
 """
 
 # %%
+def add_timestep_obs(coordinates_list, timestep):
+    """
+    Add timestep observation.
+    Args:
+        coordinates_list: list of lists:
+        timestep: int:
 
+    Returns:
+
+    """
+    return [[*coords, timestep] for coords in coordinates_list]
 
 class SwitchBuffer(Buffer):
-    def __init__(self, n_agents=5):
+    def __init__(self, obs_shape, n_agents=5):
         """
         Have to overwrite because the original buffer class has observations of dimension 1.
         Args:
@@ -1589,8 +1599,8 @@ class SwitchBuffer(Buffer):
         """
         super().__init__(n_agents=n_agents)
         for i in range(self.n_agents):
-            self.buffer['o_%d' % i] = np.empty([self.size, 2])
-            self.buffer['o_next_%d' % i] = np.empty([self.size, 2])
+            self.buffer['o_%d' % i] = np.empty([self.size, obs_shape])
+            self.buffer['o_next_%d' % i] = np.empty([self.size, obs_shape])
 
 
 class DuellingDQNAgent:
@@ -1727,7 +1737,7 @@ def switch_evaluate(env, env_max_steps, agents, n_agents, n_evaluation_episodes,
         episode_n_agents_reached_target = 0
 
         timestep = 0
-        obs_n = env.reset()
+        obs_n = add_timestep_obs(coordinates_list=env.reset(), timestep=timestep)
         done_n = [False] * n_agents
         while not all(done_n):
             timestep += 1
@@ -1735,6 +1745,7 @@ def switch_evaluate(env, env_max_steps, agents, n_agents, n_evaluation_episodes,
             actions = select_actions(agents=agents, obs_n=obs_n, epsilon=0)
 
             obs_n_next, reward_n, done_n, _ = env.step(actions)
+            obs_n_next = add_timestep_obs(obs_n_next, timestep)
             obs_n = obs_n_next
 
             # at max_timesteps done_n is set to True for all n
@@ -1786,9 +1797,10 @@ def select_actions(agents, obs_n, epsilon):
 max_timesteps = 50  # default is not 100 as suggested by docs
 env = gym.make("Switch2-v0", max_steps=max_timesteps)  # Use "Switch4-v0" for the Switch-4 game
 n_agents = env.n_agents
-agents = [DuellingDQNAgent(n_agents, i, obs_shape=2, n_actions=env.action_space[0].n) for
+obs_shape = env.observation_space[0].shape[0] + 1  # + 1 because of timestep
+agents = [DuellingDQNAgent(n_agents, i, obs_shape=obs_shape, n_actions=env.action_space[0].n) for
           i in range(n_agents)]
-buffer = SwitchBuffer(n_agents=env.n_agents)
+buffer = SwitchBuffer(n_agents=env.n_agents, obs_shape=obs_shape)
 batch_size = 256
 
 epsilon = 0.3
@@ -1805,7 +1817,7 @@ for i_episode in range(n_episodes):
     n_agents_reached_target = np.zeros(n_episodes)
 
     timestep = 0
-    obs_n = env.reset()
+    obs_n = add_timestep_obs(coordinates_list=env.reset(), timestep=timestep)
     done_n = [False] * n_agents
     print(f'episode: {i_episode+1}')
     while not all(done_n):
@@ -1816,6 +1828,7 @@ for i_episode in range(n_episodes):
         print(f'actions: {actions}')
 
         obs_n_next, reward_n, done_n, _ = env.step(actions)
+        obs_n_next = add_timestep_obs(obs_n_next, timestep)
         buffer.store_episode(obs_n[:n_agents], actions,
                               reward_n[:n_agents], obs_n_next[:n_agents])
 
