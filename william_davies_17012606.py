@@ -1494,6 +1494,7 @@ from torch import nn
 import torch
 import numpy as np
 import copy
+import math
 
 from pyvirtualdisplay import Display
 # display = Display(visible=0, size=(1400, 900))
@@ -1718,9 +1719,9 @@ class DuellingDQN(nn.Module):
 
         return qvals
 
-def switch_evaluate(env, env_max_steps, agents, n_agents, n_evaluation_episodes, render=False):
+def switch_evaluate(env, env_max_steps, agents, n_agents, n_evaluation_episodes, epsilon, render=False):
     """
-    Evaluate agents acting greedily.
+    Evaluate agents.
     Args:
         env:
         agents:
@@ -1742,7 +1743,7 @@ def switch_evaluate(env, env_max_steps, agents, n_agents, n_evaluation_episodes,
         while not all(done_n):
             timestep += 1
 
-            actions = select_actions(agents=agents, obs_n=obs_n, epsilon=0)
+            actions = select_actions(agents=agents, obs_n=obs_n, epsilon=epsilon)
 
             obs_n_next, reward_n, done_n, _ = env.step(actions)
             obs_n_next = add_timestep_obs(obs_n_next, timestep)
@@ -1803,9 +1804,16 @@ agents = [DuellingDQNAgent(n_agents, i, obs_shape=obs_shape, n_actions=env.actio
 buffer = SwitchBuffer(n_agents=env.n_agents, obs_shape=obs_shape)
 batch_size = 256
 
-epsilon = 0.3
+
+def get_epsilon(timestep):
+    initial_epsilon = 0.4
+    current_epsilon = initial_epsilon*np.exp(-timestep/30)
+    min_epsilon = 0.01
+    return max(current_epsilon, min_epsilon)
 
 n_episodes = 100
+
+training_rewards = np.zeros(n_episodes)
 
 evaluation_rate = 100  # evaluate every n episodes
 n_evaluation_episodes = 10
@@ -1824,7 +1832,7 @@ for i_episode in range(n_episodes):
         timestep += 1
         print(f'timestep: {timestep}')
 
-        actions = select_actions(agents=agents, obs_n=obs_n, epsilon=epsilon)
+        actions = select_actions(agents=agents, obs_n=obs_n, epsilon=get_epsilon(timestep))
         print(f'actions: {actions}')
 
         obs_n_next, reward_n, done_n, _ = env.step(actions)
@@ -1852,22 +1860,11 @@ for i_episode in range(n_episodes):
             evaluated_rewards[i_episode // evaluation_rate] = mean_reward
             evaluated_n_agents_reached_target[i_episode // evaluation_rate] = mean_n_agents_reached_target
 
+        episode_reward += sum(reward_n)
+    training_rewards[i_episode] = episode_reward
 env.close()
 
 breakpoint = 1
-
-env = gym.make("Switch2-v0", max_steps=max_timesteps)  # Use "Switch4-v0" for the Switch-4 game
-switch_evaluate(env=env, env_max_steps=max_timesteps, agents=agents, n_agents=n_agents, n_evaluation_episodes=1, render=True)
-env.close()
-
-show_video()
-
-# %%
-"""
-#### Plot the Learning Curve
-"""
-
-# %%
 
 # Greedy learning curve
 plt.figure()
@@ -1881,6 +1878,19 @@ plt.title('Evaluated number of agents reached target')
 plt.xlabel('Episode')
 plt.ylabel('Number of agents reached target')
 plt.plot(evaluated_episodes, evaluated_n_agents_reached_target)
+
+env = gym.make("Switch2-v0", max_steps=max_timesteps)  # Use "Switch4-v0" for the Switch-4 game
+switch_evaluate(env=env, env_max_steps=max_timesteps, agents=agents, n_agents=n_agents, n_evaluation_episodes=1, render=True)
+env.close()
+
+show_video()
+
+# %%
+"""
+#### Plot the Learning Curve
+"""
+
+# %%
 
 # %%
 """
