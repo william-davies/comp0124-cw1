@@ -1810,20 +1810,20 @@ agents = [DuellingDQNAgent(n_agents, i, obs_shape=obs_shape, n_actions=env.actio
           i in range(n_agents)]
 buffer = SwitchBuffer(n_agents=env.n_agents, obs_shape=obs_shape)
 batch_size = 256
-DOWN, LEFT, UP, RIGHT, NOOP = 0,1,2,3,4
+DOWN, LEFT, UP, RIGHT, NOOP = 0, 1, 2, 3, 4
 
 n_episodes = 1000
 
 training_rewards = np.zeros(n_episodes)
+training_n_agents_reached_target = np.zeros_like(training_rewards)
 
-evaluation_rate = 100  # evaluate every n episodes
-n_evaluation_episodes = 2
-evaluated_episodes = np.arange(start=0, stop=n_episodes, step=evaluation_rate)
-evaluated_rewards = np.zeros_like(evaluated_episodes)
-evaluated_n_agents_reached_target = np.zeros_like(evaluated_episodes)
+greedy_evaluation_rate = 50  # evaluate every n episodes
+n_evaluation_episodes = 5
+greedy_evaluated_episodes = np.arange(start=0, stop=n_episodes, step=greedy_evaluation_rate)
+greedy_rewards = np.zeros_like(greedy_evaluated_episodes)
+greedy_n_agents_reached_target = np.zeros_like(greedy_evaluated_episodes)
 for i_episode in range(n_episodes):
     episode_reward = 0
-    n_agents_reached_target = np.zeros(n_episodes)
 
     timestep = 0
     obs_n = add_timestep_obs(coordinates_list=env.reset(), timestep=timestep)
@@ -1851,17 +1851,17 @@ for i_episode in range(n_episodes):
             do_experience_replay(agents=agents, buffer=buffer)
 
         if timestep == max_timesteps - 1:
-            n_agents_reached_target[i_episode] = np.sum(done_n)
+            training_n_agents_reached_target[i_episode] = np.sum(done_n)
 
-        if i_episode % evaluation_rate == 0:
+        if i_episode % greedy_evaluation_rate == 0:
             mean_reward, mean_n_agents_reached_target = switch_evaluate(env=env,
                                                                         env_max_steps=max_timesteps,
                                                                         agents=agents,
                                                                         n_agents=n_agents,
                                                                         n_evaluation_episodes=n_evaluation_episodes,
                                                                         epsilon=0)
-            evaluated_rewards[i_episode // evaluation_rate] = mean_reward
-            evaluated_n_agents_reached_target[i_episode // evaluation_rate] = mean_n_agents_reached_target
+            greedy_rewards[i_episode // greedy_evaluation_rate] = mean_reward
+            greedy_n_agents_reached_target[i_episode // greedy_evaluation_rate] = mean_n_agents_reached_target
 
         episode_reward += sum(reward_n)
     training_rewards[i_episode] = episode_reward
@@ -1874,13 +1874,13 @@ plt.figure()
 plt.title('Evaluated reward')
 plt.xlabel('Episode')
 plt.ylabel('Reward')
-plt.plot(evaluated_episodes, evaluated_rewards)
+plt.plot(greedy_evaluated_episodes, greedy_rewards)
 
 plt.figure()
 plt.title('Evaluated number of agents reached target')
 plt.xlabel('Episode')
 plt.ylabel('Number of agents reached target')
-plt.plot(evaluated_episodes, evaluated_n_agents_reached_target)
+plt.plot(greedy_evaluated_episodes, greedy_n_agents_reached_target)
 
 env = gym.make("Switch2-v0", max_steps=max_timesteps)  # Use "Switch4-v0" for the Switch-4 game
 switch_evaluate(env=env, env_max_steps=max_timesteps, agents=agents, n_agents=n_agents, n_evaluation_episodes=1, render=True)
