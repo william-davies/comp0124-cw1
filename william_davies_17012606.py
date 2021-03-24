@@ -1731,11 +1731,7 @@ def switch_evaluate(env, agents, n_agents, n_evaluation_episodes):
         while not all(done_n):
             timestep += 1
 
-            actions = []
-            with torch.no_grad():
-                for agent_id, agent in enumerate(agents):
-                    action = agent.select_action(obs_n[agent_id], epsilon=0)
-                    actions.append(action)
+            actions = select_actions(agents=agents, obs_n=obs_n, epsilon=0)
 
             obs_n_next, reward_n, done_n, _ = env.step(actions)
             obs_n = obs_n_next
@@ -1763,23 +1759,49 @@ epsilon = 0.1
 episodes = 6
 max_timesteps = 50  # not 100 as suggested by docs
 
+
+def do_experience_replay(agents, buffer):
+    """
+    Uniformly sampled experience replay.
+    """
+    batch = buffer.sample(batch_size)
+    for agent in agents:
+        local_batch = {k: v for k, v in batch.items() if k.endswith(str(agent.agent_id))}
+        agent.train(local_batch)
+
+
+def select_actions(agents, obs_n, epsilon):
+    """
+    Each agent selects an action. Return actions_n.
+    Args:
+        agents:
+        obs_n:
+        epsilon:
+
+    Returns:
+
+    """
+    actions = []
+    with torch.no_grad():
+        for agent_id, agent in enumerate(agents):
+            action = agent.select_action(obs_n[agent_id], epsilon)
+            actions.append(action)
+    return actions
+
 for i_episode in range(episodes):
-  timestep = 0
-  ep_reward = 0
+  episode_reward = 0
   n_agents_reached_target = np.zeros(episodes)
+
+  timestep = 0
   obs_n = env.reset()
   done_n = [False] * n_agents
   print(f'episode: {i_episode+1}')
   while not all(done_n):
     timestep += 1
     print(f'timestep: {timestep}')
-    print(obs_n)
-    actions = []
-    with torch.no_grad():
-        for agent_id, agent in enumerate(agents):
-            action = agent.select_action(obs_n[agent_id], epsilon)
-            actions.append(action)
-    print(actions)
+
+    actions = select_actions(agents=agents, obs_n=obs_n, epsilon=epsilon)
+
     obs_n_next, reward_n, done_n, _ = env.step(actions)
     buffer.store_episode(obs_n[:n_agents], actions,
                           reward_n[:n_agents], obs_n_next[:n_agents])
@@ -1787,12 +1809,9 @@ for i_episode in range(episodes):
     obs_n = obs_n_next
 
     if buffer.current_size >= batch_size:
-        batch = buffer.sample(batch_size)
-        for agent in agents:
-            local_batch = {k: v for k, v in batch.items() if k.endswith(str(agent.agent_id))}
-            agent.train(local_batch)
+        do_experience_replay(agents=agents, buffer=buffer)
 
-    if timestep < max_timesteps:
+    if timestep == max_timesteps - 1:
         n_agents_reached_target[i_episode] = np.sum(done_n)
 
 env.close()
