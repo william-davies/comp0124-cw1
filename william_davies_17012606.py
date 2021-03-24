@@ -1605,7 +1605,7 @@ class SwitchBuffer(Buffer):
 
 
 class DuellingDQNAgent:
-    def __init__(self, n_agents, agent_id, n_actions, obs_shape=2, action_shape=1, lr=1e-4):
+    def __init__(self, n_agents, agent_id, n_actions, lr, obs_shape=2, action_shape=1):
         self.n_agents = n_agents
         self.agent_id = agent_id
         self.tau = 0.01
@@ -1680,8 +1680,8 @@ class DuellingDQNAgent:
         return loss
 
     def _soft_update_target_network(self):
-        for target_param, online_param in zip(self.online_DQN.parameters(),
-                                              self.target_DQN.parameters()):
+        for target_param, online_param in zip(self.target_DQN.parameters(),
+                                              self.online_DQN.parameters()):
             new_target_param = self.tau*online_param + (1 - self.tau)*target_param
             target_param.data.copy_(new_target_param)
 
@@ -1794,29 +1794,30 @@ def select_actions(agents, obs_n, epsilon):
     return actions
 
 
+def get_epsilon(timestep):
+    initial_epsilon = 0.4
+    current_epsilon = initial_epsilon*np.exp(-timestep/50)
+    min_epsilon = 0.01
+    return max(current_epsilon, min_epsilon)
+
 # TRAINING
 max_timesteps = 50  # default is not 100 as suggested by docs
 env = gym.make("Switch2-v0", max_steps=max_timesteps)  # Use "Switch4-v0" for the Switch-4 game
 n_agents = env.n_agents
 obs_shape = env.observation_space[0].shape[0] + 1  # + 1 because of timestep
-agents = [DuellingDQNAgent(n_agents, i, obs_shape=obs_shape, n_actions=env.action_space[0].n) for
+lr = 1e-3
+agents = [DuellingDQNAgent(n_agents, i, obs_shape=obs_shape, n_actions=env.action_space[0].n, lr=lr) for
           i in range(n_agents)]
 buffer = SwitchBuffer(n_agents=env.n_agents, obs_shape=obs_shape)
 batch_size = 256
+DOWN, LEFT, UP, RIGHT, NOOP = 0,1,2,3,4
 
-
-def get_epsilon(timestep):
-    initial_epsilon = 0.4
-    current_epsilon = initial_epsilon*np.exp(-timestep/30)
-    min_epsilon = 0.01
-    return max(current_epsilon, min_epsilon)
-
-n_episodes = 100
+n_episodes = 1000
 
 training_rewards = np.zeros(n_episodes)
 
 evaluation_rate = 100  # evaluate every n episodes
-n_evaluation_episodes = 10
+n_evaluation_episodes = 2
 evaluated_episodes = np.arange(start=0, stop=n_episodes, step=evaluation_rate)
 evaluated_rewards = np.zeros_like(evaluated_episodes)
 evaluated_n_agents_reached_target = np.zeros_like(evaluated_episodes)
@@ -1830,10 +1831,11 @@ for i_episode in range(n_episodes):
     print(f'episode: {i_episode+1}')
     while not all(done_n):
         timestep += 1
-        print(f'timestep: {timestep}')
+        # print(f'timestep: {timestep}')
 
         actions = select_actions(agents=agents, obs_n=obs_n, epsilon=get_epsilon(timestep))
-        print(f'actions: {actions}')
+        actions[1] = NOOP
+        # print(f'actions: {actions}')
 
         obs_n_next, reward_n, done_n, _ = env.step(actions)
         obs_n_next = add_timestep_obs(obs_n_next, timestep)
@@ -1856,7 +1858,8 @@ for i_episode in range(n_episodes):
                                                                         env_max_steps=max_timesteps,
                                                                         agents=agents,
                                                                         n_agents=n_agents,
-                                                                        n_evaluation_episodes=n_evaluation_episodes)
+                                                                        n_evaluation_episodes=n_evaluation_episodes,
+                                                                        epsilon=0)
             evaluated_rewards[i_episode // evaluation_rate] = mean_reward
             evaluated_n_agents_reached_target[i_episode // evaluation_rate] = mean_n_agents_reached_target
 
