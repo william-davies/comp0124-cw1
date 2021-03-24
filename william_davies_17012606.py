@@ -1708,7 +1708,7 @@ class DuellingDQN(nn.Module):
 
         return qvals
 
-def switch_evaluate(env, agents, n_agents, n_evaluation_episodes):
+def switch_evaluate(env, env_max_steps, agents, n_agents, n_evaluation_episodes, ):
     """
     Evaluate agents acting Greedily.
     Args:
@@ -1721,9 +1721,10 @@ def switch_evaluate(env, agents, n_agents, n_evaluation_episodes):
 
     """
     episode_rewards = np.zeros(n_evaluation_episodes)
+    episode_n_agents_reached_targets = np.zeros(n_evaluation_episodes)
     for episode in range(n_evaluation_episodes):
         episode_reward = 0
-        n_agents_reached_target = np.zeros(episodes)
+        episode_n_agents_reached_target = 0
 
         timestep = 0
         obs_n = env.reset()
@@ -1737,27 +1738,16 @@ def switch_evaluate(env, agents, n_agents, n_evaluation_episodes):
             obs_n = obs_n_next
 
             # at max_timesteps done_n is set to True for all n
-            if timestep == max_timesteps - 1:
-                n_agents_reached_target[i_episode] = np.sum(done_n)
+            if timestep == env_max_steps - 1:
+                episode_n_agents_reached_target = np.sum(done_n)
 
             episode_reward += np.sum(reward_n)
         episode_rewards[episode] = episode_reward
+        episode_n_agents_reached_targets[episode] = episode_n_agents_reached_target
 
     mean_reward = np.mean(episode_rewards)
-    return mean_reward
-
-# TRAINING
-env = gym.make("Switch2-v0")  # Use "Switch4-v0" for the Switch-4 game
-n_agents = env.n_agents
-agents = [DuellingDQNAgent(n_agents, i, obs_shape=2, n_actions=env.action_space[0].n) for
-          i in range(n_agents)]
-buffer = SwitchBuffer(n_agents=env.n_agents)
-batch_size = 256
-
-epsilon = 0.1
-
-episodes = 6
-max_timesteps = 50  # not 100 as suggested by docs
+    mean_n_agents_reached_target = np.mean(episode_n_agents_reached_targets)
+    return mean_reward, mean_n_agents_reached_target
 
 
 def do_experience_replay(agents, buffer):
@@ -1788,31 +1778,58 @@ def select_actions(agents, obs_n, epsilon):
             actions.append(action)
     return actions
 
-for i_episode in range(episodes):
-  episode_reward = 0
-  n_agents_reached_target = np.zeros(episodes)
 
-  timestep = 0
-  obs_n = env.reset()
-  done_n = [False] * n_agents
-  print(f'episode: {i_episode+1}')
-  while not all(done_n):
-    timestep += 1
-    print(f'timestep: {timestep}')
+# TRAINING
+max_timesteps = 50  # default is not 100 as suggested by docs
+env = gym.make("Switch2-v0", max_steps=max_timesteps)  # Use "Switch4-v0" for the Switch-4 game
+n_agents = env.n_agents
+agents = [DuellingDQNAgent(n_agents, i, obs_shape=2, n_actions=env.action_space[0].n) for
+          i in range(n_agents)]
+buffer = SwitchBuffer(n_agents=env.n_agents)
+batch_size = 256
+evaluation_rate = 100  # evaluate every n episodes
+n_evaluation_episodes = 10
 
-    actions = select_actions(agents=agents, obs_n=obs_n, epsilon=epsilon)
+epsilon = 0.1
 
-    obs_n_next, reward_n, done_n, _ = env.step(actions)
-    buffer.store_episode(obs_n[:n_agents], actions,
-                          reward_n[:n_agents], obs_n_next[:n_agents])
+n_episodes = 6
+evaluated_episodes = np.arange(start=0, stop=n_episodes+1, step=evaluation_rate)
+evaluated_rewards = np.zeros_like(evaluated_episodes)
+evaluated_n_agents_reached_target = np.zeros_like(evaluated_episodes)
+for i_episode in range(n_episodes):
+    episode_reward = 0
+    n_agents_reached_target = np.zeros(n_episodes)
 
-    obs_n = obs_n_next
+    timestep = 0
+    obs_n = env.reset()
+    done_n = [False] * n_agents
+    print(f'episode: {i_episode+1}')
+    while not all(done_n):
+        timestep += 1
+        print(f'timestep: {timestep}')
 
-    if buffer.current_size >= batch_size:
-        do_experience_replay(agents=agents, buffer=buffer)
+        actions = select_actions(agents=agents, obs_n=obs_n, epsilon=epsilon)
 
-    if timestep == max_timesteps - 1:
-        n_agents_reached_target[i_episode] = np.sum(done_n)
+        obs_n_next, reward_n, done_n, _ = env.step(actions)
+        buffer.store_episode(obs_n[:n_agents], actions,
+                              reward_n[:n_agents], obs_n_next[:n_agents])
+
+        obs_n = obs_n_next
+
+        if buffer.current_size >= batch_size:
+            do_experience_replay(agents=agents, buffer=buffer)
+
+        if timestep == max_timesteps - 1:
+            n_agents_reached_target[i_episode] = np.sum(done_n)
+
+        if i_episode % evaluation_rate == 0:
+            mean_reward, mean_n_agents_reached_target = switch_evaluate(env=env,
+                                                                        env_max_steps=max_timesteps,
+                                                                        agents=agents,
+                                                                        n_agents=n_agents,
+                                                                        n_evaluation_episodes=n_evaluation_episodes)
+            evaluated_rewards[i_episode // evaluation_rate] = mean_reward
+            evaluated_n_agents_reached_target[i_episode // evaluation_rate] = mean_n_agents_reached_target
 
 env.close()
 
@@ -1825,6 +1842,17 @@ breakpoint = 1
 
 # %%
 
+plt.figure()
+plt.title('Evaluated reward')
+plt.xlabel('Episode')
+plt.ylabel('Reward')
+plt.plot(evaluated_episodes, evaluated_rewards)
+
+plt.figure()
+plt.title('Evaluated umber of agents reached target')
+plt.xlabel('Episode')
+plt.ylabel('Number of agents reached target')
+plt.plot(evaluated_episodes, evaluated_n_agents_reached_target)
 
 # %%
 """
