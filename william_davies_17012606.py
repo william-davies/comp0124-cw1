@@ -667,33 +667,33 @@ the Matrix Game, the Stochastic Game, the Nonzero-sum Game and Deep Multi-Agent 
 # import matplotlib.pyplot as plt
 # from copy import deepcopy
 #
-# def rollout(env, agents, exploration=True, max_episode=30000, log_episode_interval=500, verbose=False):
-#     history_reward = []
-#     state_n = env.reset()
-#     episode_reward = 0
-#     episode_count = 0
-#     recorded_episodes = []
-#     recorded_episode_reward = []
-#     while episode_count < max_episode:
-#         actions = np.array([agent.act(state, exploration) for state, agent in zip(state_n, agents)])
-#         next_state_n, reward_n, done_n, _ = env.step(actions)
-#         episode_reward += np.mean(reward_n)
-#         for j, (state, reward, next_state, done, agent) in enumerate(zip(state_n, reward_n, next_state_n, done_n, agents)):
-#             agent.update(state, actions[j], reward, next_state, done)
-#         state_n = next_state_n
-#         if np.all(done_n):
-#             state_n = env.reset()
-#             history_reward.append(episode_reward)
-#             episode_reward = 0
-#             episode_count += 1
-#             if episode_count % log_episode_interval == 0:
-#                 recorded_episodes.append(episode_count)
-#                 episodes_mean_reward = np.mean(history_reward)
-#                 recorded_episode_reward.append(episodes_mean_reward)
-#                 history_reward = []
-#             if verbose:
-#                 print('Episodes {}, Reward {}'.format(episode_count, episodes_mean_reward))
-#     return recorded_episodes, recorded_episode_reward
+def rollout(env, agents, exploration=True, max_episode=30000, log_episode_interval=500, verbose=False):
+    history_reward = []
+    state_n = env.reset()
+    episode_reward = 0
+    episode_count = 0
+    recorded_episodes = []
+    recorded_episode_reward = []
+    while episode_count < max_episode:
+        actions = np.array([agent.act(state, exploration) for state, agent in zip(state_n, agents)])
+        next_state_n, reward_n, done_n, _ = env.step(actions)
+        episode_reward += np.mean(reward_n)
+        for j, (state, reward, next_state, done, agent) in enumerate(zip(state_n, reward_n, next_state_n, done_n, agents)):
+            agent.update(state, actions[j], reward, next_state, done)
+        state_n = next_state_n
+        if np.all(done_n):
+            state_n = env.reset()
+            history_reward.append(episode_reward)
+            episode_reward = 0
+            episode_count += 1
+            if episode_count % log_episode_interval == 0:
+                recorded_episodes.append(episode_count)
+                episodes_mean_reward = np.mean(history_reward)
+                recorded_episode_reward.append(episodes_mean_reward)
+                history_reward = []
+            if verbose:
+                print('Episodes {}, Reward {}'.format(episode_count, episodes_mean_reward))
+    return recorded_episodes, recorded_episode_reward
 #
 # # %%
 # agent_num = 2
@@ -1320,34 +1320,34 @@ class Buffer:
         if inc == 1:
             idx = idx[0]
         return idx
-#
-# def evaluate(env, agents, agent_num, evaluate_episodes, evaluate_episode_len):
-#     returns = []
-#     for episode in range(evaluate_episodes):
-#         # reset the environment
-#         s = env.reset()
-#         rewards_n = np.zeros(agent_num)
-#         rs = []
-#         alist = []
-#         rewards1 = 0
-#         for time_step in range(evaluate_episode_len):
-#             actions = []
-#             with torch.no_grad():
-#                 for agent_id, agent in enumerate(agents):
-#                     action = agent.select_action(s[agent_id], 0, 0)
-#                     actions.append(action)
-#             s_next, r, done, info = env.step(actions)
-#             if type(info['reward_n']) is list:
-#                 rewards_n += np.sum(info['reward_n'])
-#             else:
-#                 rewards_n += info['reward_n'].squeeze()
-#
-#             s = s_next
-#         returns.append(rewards_n)
-#     s = env.reset()
-#     mean_return = sum(returns) / evaluate_episodes
-#
-#     return mean_return
+
+def evaluate(env, agents, agent_num, evaluate_episodes, evaluate_episode_len):
+    returns = []
+    for episode in range(evaluate_episodes):
+        # reset the environment
+        s = env.reset()
+        rewards_n = np.zeros(agent_num)
+        rs = []
+        alist = []
+        rewards1 = 0
+        for time_step in range(evaluate_episode_len):
+            actions = []
+            with torch.no_grad():
+                for agent_id, agent in enumerate(agents):
+                    action = agent.select_action(s[agent_id], 0, 0)
+                    actions.append(action)
+            s_next, r, done, info = env.step(actions)
+            if type(info['reward_n']) is list:
+                rewards_n += np.sum(info['reward_n'])
+            else:
+                rewards_n += info['reward_n'].squeeze()
+
+            s = s_next
+        returns.append(rewards_n)
+    s = env.reset()
+    mean_return = sum(returns) / evaluate_episodes
+
+    return mean_return
 #
 #
 # # %%
@@ -1594,7 +1594,7 @@ class SwitchBuffer(Buffer):
 
 
 class DuellingDQNAgent:
-    def __init__(self, n_agents, agent_id, n_actions, obs_shape=2, action_shape=1):
+    def __init__(self, n_agents, agent_id, n_actions, obs_shape=2, action_shape=1, lr=1e-4):
         self.n_agents = n_agents
         self.agent_id = agent_id
         self.tau = 0.01
@@ -1603,7 +1603,7 @@ class DuellingDQNAgent:
 
         self.online_DQN = DuellingDQN(obs_shape, n_actions)
         self.target_DQN = copy.deepcopy(self.online_DQN)  # copy weights
-        self.optimizer = torch.optim.Adam(self.online_DQN.parameters())
+        self.optimizer = torch.optim.Adam(params=self.online_DQN.parameters(), lr=lr)
         self.MSE_loss = nn.MSELoss()
 
     def select_action(self, observation, epsilon):
@@ -1708,23 +1708,23 @@ class DuellingDQN(nn.Module):
 
         return qvals
 
-
+# TRAINING
 env = gym.make("Switch2-v0")  # Use "Switch4-v0" for the Switch-4 game
-# env = Monitor(env, directory='recordings', force=True)
 n_agents = env.n_agents
 agents = [DuellingDQNAgent(n_agents, i, obs_shape=2, n_actions=env.action_space[0].n) for
           i in range(n_agents)]
 buffer = SwitchBuffer(n_agents=env.n_agents)
 batch_size = 256
 
-ep_reward = 0
-obs_n = env.reset()
 epsilon = 0.1
 
 episodes = 6
+max_timesteps = 50  # not 100 as suggested by docs
 
 for i_episode in range(episodes):
   timestep = 0
+  ep_reward = 0
+  n_agents_reached_target = np.zeros(episodes)
   obs_n = env.reset()
   done_n = [False] * n_agents
   print(f'episode: {i_episode+1}')
@@ -1749,7 +1749,10 @@ for i_episode in range(episodes):
         for agent in agents:
             local_batch = {k: v for k, v in batch.items() if k.endswith(str(agent.agent_id))}
             agent.train(local_batch)
-    # env.render()
+
+    if timestep < max_timesteps:
+        n_agents_reached_target[i_episode] = np.sum(done_n)
+
 env.close()
 
 breakpoint = 1
