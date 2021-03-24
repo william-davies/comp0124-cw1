@@ -1,6 +1,6 @@
 # %%
 """
-# COMP0124 MAAI Individual Coursework 
+# COMP0124 MAAI Individual Coursework
 
 This 50-point individual coursework has four parts,
 the Matrix Game, the Stochastic Game, the Nonzero-sum Game and Deep Multi-Agent Reinforcement Learning.
@@ -13,7 +13,7 @@ the Matrix Game, the Stochastic Game, the Nonzero-sum Game and Deep Multi-Agent 
 3.   Before submitting your notebook, **make sure that it runs without errors**, we also provide a validation tool in the end of this notebook.
   - To check this, reload your notebook and the Python kernel, and run the notebook from the first to the last cell.
   - Please do not change any methods or variables' name in the notebook, otherwise, you cannot get marking correctly.
-  - We would not help you debug the code, if we cannot run your submitted notebook, you will get zero point. 
+  - We would not help you debug the code, if we cannot run your submitted notebook, you will get zero point.
 4.  Download your notebook and submit it on Moodle.
   - Click on "File -> Download .ipynb".
   - Rename your notebook to ***firstname_lastname_studentnumber.ipynb***. (Please strictly follow the naming requirement.)
@@ -1514,9 +1514,9 @@ def show_video():
                     loop controls style="height: 400px;">
                     <source src="data:video/mp4;base64,{0}" type="video/mp4" />
                  </video>'''.format(encoded.decode('ascii'))))
-    else: 
+    else:
         print("Could not find video")
-    
+
 
 def wrap_env(env):
     env = Monitor(env, './video', force=True)
@@ -1602,7 +1602,7 @@ class DuellingDQNAgent:
         self.action_shape = action_shape
 
         self.online_DQN = DuellingDQN(obs_shape, n_actions)
-        self.target_DQN = copy.deepcopy(self.online_DQN)  # copy weights
+        self.target_DQN = DuellingDQN(obs_shape, n_actions)
         self.optimizer = torch.optim.Adam(params=self.online_DQN.parameters(), lr=lr)
         self.MSE_loss = nn.MSELoss()
 
@@ -1640,7 +1640,7 @@ class DuellingDQNAgent:
         self.optimizer.step()
 
         self._soft_update_target_network()
-    
+
     def compute_loss(self, local_batch):
         """
         Compute loss between current DQN and target DQN networks.
@@ -1663,7 +1663,7 @@ class DuellingDQNAgent:
         current_Q = current_Q.squeeze(1)
 
         next_Q = self.target_DQN.forward(observation=o_next)
-        target_Q = r + self.gamma*torch.max(next_Q)
+        target_Q = r + self.gamma*torch.max(input=next_Q, dim=1)[0]
 
         loss = self.MSE_loss(current_Q, target_Q)
         return loss
@@ -1710,7 +1710,7 @@ class DuellingDQN(nn.Module):
 
 def switch_evaluate(env, env_max_steps, agents, n_agents, n_evaluation_episodes, render=False):
     """
-    Evaluate agents acting Greedily.
+    Evaluate agents acting greedily.
     Args:
         env:
         agents:
@@ -1790,13 +1790,14 @@ agents = [DuellingDQNAgent(n_agents, i, obs_shape=2, n_actions=env.action_space[
           i in range(n_agents)]
 buffer = SwitchBuffer(n_agents=env.n_agents)
 batch_size = 256
+
+epsilon = 0.3
+
+n_episodes = 100
+
 evaluation_rate = 100  # evaluate every n episodes
 n_evaluation_episodes = 10
-
-epsilon = 0.1
-
-n_episodes = 6
-evaluated_episodes = np.arange(start=0, stop=n_episodes+1, step=evaluation_rate)
+evaluated_episodes = np.arange(start=0, stop=n_episodes, step=evaluation_rate)
 evaluated_rewards = np.zeros_like(evaluated_episodes)
 evaluated_n_agents_reached_target = np.zeros_like(evaluated_episodes)
 for i_episode in range(n_episodes):
@@ -1809,14 +1810,19 @@ for i_episode in range(n_episodes):
     print(f'episode: {i_episode+1}')
     while not all(done_n):
         timestep += 1
+        print(f'timestep: {timestep}')
 
         actions = select_actions(agents=agents, obs_n=obs_n, epsilon=epsilon)
+        print(f'actions: {actions}')
 
         obs_n_next, reward_n, done_n, _ = env.step(actions)
         buffer.store_episode(obs_n[:n_agents], actions,
                               reward_n[:n_agents], obs_n_next[:n_agents])
 
         obs_n = obs_n_next
+
+        if timestep < max_timesteps and np.sum(reward_n) > 0:
+            print(f'reward_n: {reward_n}')
 
         if buffer.current_size >= batch_size:
             do_experience_replay(agents=agents, buffer=buffer)
@@ -1850,6 +1856,7 @@ show_video()
 
 # %%
 
+# Greedy learning curve
 plt.figure()
 plt.title('Evaluated reward')
 plt.xlabel('Episode')
@@ -1857,7 +1864,7 @@ plt.ylabel('Reward')
 plt.plot(evaluated_episodes, evaluated_rewards)
 
 plt.figure()
-plt.title('Evaluated umber of agents reached target')
+plt.title('Evaluated number of agents reached target')
 plt.xlabel('Episode')
 plt.ylabel('Number of agents reached target')
 plt.plot(evaluated_episodes, evaluated_n_agents_reached_target)
