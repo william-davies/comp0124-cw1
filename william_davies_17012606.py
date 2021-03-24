@@ -1708,6 +1708,48 @@ class DuellingDQN(nn.Module):
 
         return qvals
 
+def switch_evaluate(env, agents, n_agents, n_evaluation_episodes):
+    """
+    Evaluate agents acting Greedily.
+    Args:
+        env:
+        agents:
+        n_agents:
+        n_evaluation_episodes:
+
+    Returns:
+
+    """
+    episode_rewards = np.zeros(n_evaluation_episodes)
+    for episode in range(n_evaluation_episodes):
+        episode_reward = 0
+        n_agents_reached_target = np.zeros(episodes)
+
+        timestep = 0
+        obs_n = env.reset()
+        done_n = [False] * n_agents
+        while not all(done_n):
+            timestep += 1
+
+            actions = []
+            with torch.no_grad():
+                for agent_id, agent in enumerate(agents):
+                    action = agent.select_action(obs_n[agent_id], epsilon=0)
+                    actions.append(action)
+
+            obs_n_next, reward_n, done_n, _ = env.step(actions)
+            obs_n = obs_n_next
+
+            # at max_timesteps done_n is set to True for all n
+            if timestep == max_timesteps - 1:
+                n_agents_reached_target[i_episode] = np.sum(done_n)
+
+            episode_reward += np.sum(reward_n)
+        episode_rewards[episode] = episode_reward
+
+    mean_reward = np.mean(episode_rewards)
+    return mean_reward
+
 # TRAINING
 env = gym.make("Switch2-v0")  # Use "Switch4-v0" for the Switch-4 game
 n_agents = env.n_agents
