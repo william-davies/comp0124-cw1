@@ -1075,7 +1075,8 @@ class CournotDuopoly(gym.Env):
             payoff_derivative_n[i] = self.payoff_n_derivative(actions, i)
             reward_n[i] = self.payoff(actions, i)
         self.rewards = reward_n
-        state_n = np.array(list([[0.0 * i] for i in range(self.agent_num)]))
+        # state_n = np.array(list([[0.0 * i] for i in range(self.agent_num)]))
+        state_n = actions
         info = {'reward_n': reward_n, 'reward_n_derivative': payoff_derivative_n}
         done_n = np.array([True] * self.agent_num)
         self.t += 1
@@ -1217,7 +1218,7 @@ class MADDPG:
             q_next = self.critic_target_network(o_next, u_next).detach()
 
             ########### TODO: Calculate the target Q value function (0.5 point) ###########
-            target_q = r + self.gamma*q_next
+            target_q = r.unsqueeze(1) + self.gamma*q_next
             ########### END TODO ############################
 
         # the q loss
@@ -1357,64 +1358,63 @@ def evaluate(env, agents, agent_num, evaluate_episodes, evaluate_episode_len):
 # """
 #
 # # %%
-# from tqdm import tqdm
-# import matplotlib.pyplot as plt
-#
-# noise = 0.1
-# epsilon = 0.1
-# episode_limit = 100
-# n_agents = 5
-# batch_size = 256
-# evaluate_rate = 1000
-# time_steps = 20000
-# evaluate_episode_len = 100
-# evaluate_episodes = 100
-# env = CournotDuopoly(agent_num=n_agents)
-# agents = [MADDPG(n_agents, i, obs_shape=1, action_shape=1) for
-#           i in range(n_agents)]
-# buffer = Buffer(n_agents=n_agents)
-#
-# returns = []
-# done = None
-# mean_return_eval = 0.
-# for time_step in tqdm(range(time_steps)):
-#     if time_step % episode_limit == 0 or np.all(done):
-#         s = env.reset()
-#     u = []
-#     actions = []
-#     with torch.no_grad():
-#         for agent_id, agent in enumerate(agents):
-#             action = agent.select_action(s[agent_id], noise, epsilon)
-#             u.append(action)
-#             actions.append(action)
-#
-#     s_next, r, done, info = env.step(actions)
-#     buffer.store_episode(s[:n_agents], u,
-#                          r[:n_agents], s_next[:n_agents])
-#
-#     s = s_next
-#
-#     if buffer.current_size >= batch_size:
-#         transitions = buffer.sample(batch_size)
-#         for agent in agents:
-#             other_agents = agents.copy()
-#             other_agents.remove(agent)
-#             agent.learn(transitions, other_agents)
-#
-#     if time_step == 0 or time_step % evaluate_rate == 0:
-#         mean_return_eval = evaluate(env, agents, n_agents,
-#                                     evaluate_episodes, evaluate_episode_len)
-#         returns.append(mean_return_eval)
-#         print(mean_return_eval)
-# plt.figure()
-# plt.plot(range(len(returns)), np.array(returns).sum(-1))
-# plt.xlabel('episode * ' + str(evaluate_rate / episode_limit))
-# plt.ylabel('average returns')
-# plt.tight_layout()
-# plt.show()
+from tqdm import tqdm
+import matplotlib.pyplot as plt
+
+noise = 0.1
+epsilon = 0.1
+episode_limit = 100
+n_agents = 5
+batch_size = 256
+evaluate_rate = 1000
+time_steps = 20000
+evaluate_episode_len = 100
+evaluate_episodes = 100
+env = CournotDuopoly(agent_num=n_agents)
+agents = [MADDPG(n_agents, i, obs_shape=1, action_shape=1) for
+          i in range(n_agents)]
+buffer = Buffer(n_agents=n_agents)
+
+returns = []
+done = None
+mean_return_eval = 0.
+for time_step in tqdm(range(time_steps)):
+    if time_step % episode_limit == 0 or np.all(done):
+        s = env.reset()
+    u = []
+    actions = []
+    with torch.no_grad():
+        for agent_id, agent in enumerate(agents):
+            action = agent.select_action(s[agent_id], noise, epsilon)
+            u.append(action)
+            actions.append(action)
+
+    s_next, r, done, info = env.step(actions)
+    buffer.store_episode(s[:n_agents], u,
+                         r[:n_agents], s_next[:n_agents])
+
+    s = s_next
+
+    if buffer.current_size >= batch_size:
+        transitions = buffer.sample(batch_size)
+        for agent in agents:
+            other_agents = agents.copy()
+            other_agents.remove(agent)
+            agent.learn(transitions, other_agents)
+
+    if time_step == 0 or time_step % evaluate_rate == 0:
+        mean_return_eval = evaluate(env, agents, n_agents,
+                                    evaluate_episodes, evaluate_episode_len)
+        returns.append(mean_return_eval)
+        print(mean_return_eval)
+plt.figure()
+plt.plot(range(len(returns)), np.array(returns).sum(-1))
+plt.xlabel('episode * ' + str(evaluate_rate / episode_limit))
+plt.ylabel('average returns')
+plt.tight_layout()
+plt.show()
 #
 # # %%
-# returns
 #
 # # %%
 # """
