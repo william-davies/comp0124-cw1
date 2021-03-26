@@ -1366,9 +1366,9 @@ epsilon = 0.1
 episode_limit = 100
 n_agents = 5
 batch_size = 256
-evaluate_rate = 1000
-time_steps = 20000
-evaluate_episode_len = 100
+evaluate_rate = 10
+time_steps = 100
+evaluate_episode_len = 5
 evaluate_episodes = 100
 env = CournotDuopoly(agent_num=n_agents)
 agents = [MADDPG(n_agents, i, obs_shape=1, action_shape=1) for
